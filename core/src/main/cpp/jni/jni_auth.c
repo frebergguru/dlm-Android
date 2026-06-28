@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeAuth_nMode(JNIEnv *env, jobject thiz)
+Java_guru_freberg_dlm_core_jni_NativeAuth_nMode(JNIEnv *env, jobject thiz)
 {
     (void)env; (void)thiz;
     ia_credentials c;
@@ -20,14 +20,14 @@ Java_com_dlm_core_jni_NativeAuth_nMode(JNIEnv *env, jobject thiz)
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_dlm_core_jni_NativeAuth_nModeStr(JNIEnv *env, jobject thiz, jint mode)
+Java_guru_freberg_dlm_core_jni_NativeAuth_nModeStr(JNIEnv *env, jobject thiz, jint mode)
 {
     (void)thiz;
     return jstr_new(env, dlm_ia_mode_str((ia_auth_mode)mode));
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeAuth_nSaveS3(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeAuth_nSaveS3(JNIEnv *env, jobject thiz,
         jstring access, jstring secret)
 {
     (void)thiz;
@@ -38,7 +38,7 @@ Java_com_dlm_core_jni_NativeAuth_nSaveS3(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeAuth_nSaveCookie(JNIEnv *env, jobject thiz, jstring cookie)
+Java_guru_freberg_dlm_core_jni_NativeAuth_nSaveCookie(JNIEnv *env, jobject thiz, jstring cookie)
 {
     (void)thiz;
     char *c = jstr_dup(env, cookie);
@@ -48,7 +48,7 @@ Java_com_dlm_core_jni_NativeAuth_nSaveCookie(JNIEnv *env, jobject thiz, jstring 
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeAuth_nLogout(JNIEnv *env, jobject thiz)
+Java_guru_freberg_dlm_core_jni_NativeAuth_nLogout(JNIEnv *env, jobject thiz)
 {
     (void)env; (void)thiz;
     return dlm_ia_logout();
@@ -56,7 +56,7 @@ Java_com_dlm_core_jni_NativeAuth_nLogout(JNIEnv *env, jobject thiz)
 
 /* Returns null on success, or a human-readable error message on failure. */
 JNIEXPORT jstring JNICALL
-Java_com_dlm_core_jni_NativeAuth_nLoginPassword(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeAuth_nLoginPassword(JNIEnv *env, jobject thiz,
         jstring email, jstring password)
 {
     (void)thiz;

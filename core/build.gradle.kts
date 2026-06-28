@@ -11,7 +11,7 @@ kotlin {
 }
 
 android {
-    namespace = "com.dlm.core"
+    namespace = "guru.freberg.dlm.core"
     compileSdk = 37
     ndkVersion = "30.0.14904198"
 

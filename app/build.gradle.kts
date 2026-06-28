@@ -12,12 +12,12 @@ kotlin {
 }
 
 android {
-    namespace = "com.dlm.android"
+    namespace = "guru.freberg.dlm"
     compileSdk = 37
     ndkVersion = "30.0.14904198"
 
     defaultConfig {
-        applicationId = "com.dlm.android"
+        applicationId = "guru.freberg.dlm"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

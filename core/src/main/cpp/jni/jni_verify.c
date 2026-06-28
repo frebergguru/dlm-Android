@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeVerify_nMd5(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeVerify_nMd5(JNIEnv *env, jobject thiz,
         jstring path, jstring expected)
 {
     (void)thiz;
@@ -16,7 +16,7 @@ Java_com_dlm_core_jni_NativeVerify_nMd5(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeVerify_nSha1(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeVerify_nSha1(JNIEnv *env, jobject thiz,
         jstring path, jstring expected)
 {
     (void)thiz;

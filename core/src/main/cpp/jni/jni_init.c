@@ -26,11 +26,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
     if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK)
         return JNI_ERR;
 
-    g_jni.storeRow = global_ref(env, "com/dlm/core/model/StoreRow");
-    g_jni.pkgRow = global_ref(env, "com/dlm/core/model/PackageRow");
-    g_jni.task = global_ref(env, "com/dlm/core/model/Task");
-    g_jni.extractResult = global_ref(env, "com/dlm/core/model/ExtractResult");
-    g_jni.progressSink = global_ref(env, "com/dlm/core/jni/ProgressSink");
+    g_jni.storeRow = global_ref(env, "guru/freberg/dlm/core/model/StoreRow");
+    g_jni.pkgRow = global_ref(env, "guru/freberg/dlm/core/model/PackageRow");
+    g_jni.task = global_ref(env, "guru/freberg/dlm/core/model/Task");
+    g_jni.extractResult = global_ref(env, "guru/freberg/dlm/core/model/ExtractResult");
+    g_jni.progressSink = global_ref(env, "guru/freberg/dlm/core/jni/ProgressSink");
     if (!g_jni.storeRow || !g_jni.pkgRow || !g_jni.task ||
         !g_jni.extractResult || !g_jni.progressSink)
         return JNI_ERR;
@@ -46,7 +46,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
         "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;"
         "Ljava/lang/String;[Ljava/lang/String;I)V");
     g_jni.extractResultCtor = (*env)->GetMethodID(env, g_jni.extractResult, "<init>",
-        "(Ljava/lang/String;[Lcom/dlm/core/model/Task;Z)V");
+        "(Ljava/lang/String;[Lguru/freberg/dlm/core/model/Task;Z)V");
     g_jni.progressOnProgress = (*env)->GetMethodID(env, g_jni.progressSink,
         "onProgress", "(JJD)V");
     if (!g_jni.storeRowCtor || !g_jni.pkgRowCtor || !g_jni.taskCtor ||
@@ -61,7 +61,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
  * iaauth.c reads XDG_CONFIG_HOME; libcurl honours CURL_CA_BUNDLE at handle
  * creation, so neither vendored file needs editing. */
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeLib_nativeInit(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeLib_nativeInit(JNIEnv *env, jobject thiz,
                                            jstring configDir, jstring caBundle)
 {
     (void)thiz;
@@ -81,14 +81,14 @@ Java_com_dlm_core_jni_NativeLib_nativeInit(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT void JNICALL
-Java_com_dlm_core_jni_NativeLib_nativeCleanup(JNIEnv *env, jobject thiz)
+Java_guru_freberg_dlm_core_jni_NativeLib_nativeCleanup(JNIEnv *env, jobject thiz)
 {
     (void)env; (void)thiz;
     dlm_global_cleanup();
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_dlm_core_jni_NativeLib_version(JNIEnv *env, jobject thiz)
+Java_guru_freberg_dlm_core_jni_NativeLib_version(JNIEnv *env, jobject thiz)
 {
     (void)thiz;
     return jstr_new(env, dlm_version());

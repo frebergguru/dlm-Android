@@ -51,7 +51,7 @@ static void headers_free(char **h, int n)
 
 /* A heap cancel cell shared with the JVM: Kotlin flips it via nCancel. */
 JNIEXPORT jlong JNICALL
-Java_com_dlm_core_jni_NativeEngine_nAllocCancel(JNIEnv *env, jobject thiz)
+Java_guru_freberg_dlm_core_jni_NativeEngine_nAllocCancel(JNIEnv *env, jobject thiz)
 {
     (void)env; (void)thiz;
     volatile int *cell = calloc(1, sizeof *cell);
@@ -59,21 +59,21 @@ Java_com_dlm_core_jni_NativeEngine_nAllocCancel(JNIEnv *env, jobject thiz)
 }
 
 JNIEXPORT void JNICALL
-Java_com_dlm_core_jni_NativeEngine_nCancel(JNIEnv *env, jobject thiz, jlong cell)
+Java_guru_freberg_dlm_core_jni_NativeEngine_nCancel(JNIEnv *env, jobject thiz, jlong cell)
 {
     (void)env; (void)thiz;
     if (cell) *(volatile int *)(intptr_t)cell = 1;
 }
 
 JNIEXPORT void JNICALL
-Java_com_dlm_core_jni_NativeEngine_nFreeCancel(JNIEnv *env, jobject thiz, jlong cell)
+Java_guru_freberg_dlm_core_jni_NativeEngine_nFreeCancel(JNIEnv *env, jobject thiz, jlong cell)
 {
     (void)env; (void)thiz;
     free((void *)(intptr_t)cell);
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeEngine_nDownload(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeEngine_nDownload(JNIEnv *env, jobject thiz,
         jstring url, jstring outPath, jint connections, jlong minSplit,
         jint maxRetries, jlong maxSpeed, jobjectArray headers, jlong cancelCell,
         jobject sink)

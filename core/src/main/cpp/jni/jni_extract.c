@@ -89,7 +89,7 @@ static jobject result_to_jobject(JNIEnv *env, const dlm_extract_result *r,
  * fails, so a non-OK result on a non-archive.org URL means it fell through to
  * the (Android-stubbed) yt-dlp branch — flag it for the JVM runtime. */
 JNIEXPORT jobject JNICALL
-Java_com_dlm_core_jni_NativeExtract_nExtract(JNIEnv *env, jobject thiz, jstring url)
+Java_guru_freberg_dlm_core_jni_NativeExtract_nExtract(JNIEnv *env, jobject thiz, jstring url)
 {
     (void)thiz;
     char *u = jstr_dup(env, url);
@@ -112,7 +112,7 @@ Java_com_dlm_core_jni_NativeExtract_nExtract(JNIEnv *env, jobject thiz, jstring 
 /* NativeExtract.nParseYtdlp(json, url): feed yt-dlp -J output through the
  * verbatim dlm_ytdlp_parse(). */
 JNIEXPORT jobject JNICALL
-Java_com_dlm_core_jni_NativeExtract_nParseYtdlp(JNIEnv *env, jobject thiz,
+Java_guru_freberg_dlm_core_jni_NativeExtract_nParseYtdlp(JNIEnv *env, jobject thiz,
         jstring json, jstring url)
 {
     (void)thiz;
@@ -134,7 +134,7 @@ Java_com_dlm_core_jni_NativeExtract_nParseYtdlp(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_dlm_core_jni_NativeExtract_nIsArchiveOrg(JNIEnv *env, jobject thiz, jstring url)
+Java_guru_freberg_dlm_core_jni_NativeExtract_nIsArchiveOrg(JNIEnv *env, jobject thiz, jstring url)
 {
     (void)thiz;
     char *u = jstr_dup(env, url);
@@ -144,7 +144,7 @@ Java_com_dlm_core_jni_NativeExtract_nIsArchiveOrg(JNIEnv *env, jobject thiz, jst
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_dlm_core_jni_NativeExtract_nFilenameFromUrl(JNIEnv *env, jobject thiz, jstring url)
+Java_guru_freberg_dlm_core_jni_NativeExtract_nFilenameFromUrl(JNIEnv *env, jobject thiz, jstring url)
 {
     (void)thiz;
     char *u = jstr_dup(env, url);

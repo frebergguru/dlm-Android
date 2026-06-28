@@ -4,7 +4,7 @@
 #include "dlm/dlm.h"
 
 JNIEXPORT jlong JNICALL
-Java_com_dlm_core_jni_NativeLib_parseRate(JNIEnv *env, jobject thiz, jstring s)
+Java_guru_freberg_dlm_core_jni_NativeLib_parseRate(JNIEnv *env, jobject thiz, jstring s)
 {
     (void)thiz;
     char *c = jstr_dup(env, s);
@@ -14,7 +14,7 @@ Java_com_dlm_core_jni_NativeLib_parseRate(JNIEnv *env, jobject thiz, jstring s)
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_dlm_core_jni_NativeLib_formatRate(JNIEnv *env, jobject thiz, jlong bps)
+Java_guru_freberg_dlm_core_jni_NativeLib_formatRate(JNIEnv *env, jobject thiz, jlong bps)
 {
     (void)thiz;
     char buf[64];

@@ -10,7 +10,7 @@
 #define ST(h) ((dlm_store *)(intptr_t)(h))
 
 JNIEXPORT jlong JNICALL
-Java_com_dlm_core_jni_NativeStore_nOpen(JNIEnv *env, jclass cls, jstring path)
+Java_guru_freberg_dlm_core_jni_NativeStore_nOpen(JNIEnv *env, jclass cls, jstring path)
 {
     (void)cls;
     char *p = jstr_dup(env, path);
@@ -20,14 +20,14 @@ Java_com_dlm_core_jni_NativeStore_nOpen(JNIEnv *env, jclass cls, jstring path)
 }
 
 JNIEXPORT void JNICALL
-Java_com_dlm_core_jni_NativeStore_nClose(JNIEnv *env, jclass cls, jlong h)
+Java_guru_freberg_dlm_core_jni_NativeStore_nClose(JNIEnv *env, jclass cls, jlong h)
 {
     (void)env; (void)cls;
     if (h) dlm_store_close(ST(h));
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_dlm_core_jni_NativeStore_nAdd(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nAdd(JNIEnv *env, jclass cls, jlong h,
         jstring url, jstring outPath, jint conns, jint delegate, jlong createdAt)
 {
     (void)cls;
@@ -38,7 +38,7 @@ Java_com_dlm_core_jni_NativeStore_nAdd(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_dlm_core_jni_NativeStore_nAddFull(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nAddFull(JNIEnv *env, jclass cls, jlong h,
         jstring url, jstring outPath, jint conns, jint delegate, jlong total,
         jlong downloaded, jstring state, jstring error, jlong createdAt,
         jlong packageId, jint priority, jint enabled, jint autostart,
@@ -76,7 +76,7 @@ Java_com_dlm_core_jni_NativeStore_nAddFull(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nSetProgress(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nSetProgress(JNIEnv *env, jclass cls, jlong h,
         jlong id, jlong total, jlong downloaded)
 {
     (void)env; (void)cls;
@@ -84,7 +84,7 @@ Java_com_dlm_core_jni_NativeStore_nSetProgress(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nSetState(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nSetState(JNIEnv *env, jclass cls, jlong h,
         jlong id, jstring state, jstring error)
 {
     (void)cls;
@@ -96,7 +96,7 @@ Java_com_dlm_core_jni_NativeStore_nSetState(JNIEnv *env, jclass cls, jlong h,
 
 #define SETTER_INT(Name, fn) \
 JNIEXPORT jint JNICALL \
-Java_com_dlm_core_jni_NativeStore_##Name(JNIEnv *env, jclass cls, jlong h, \
+Java_guru_freberg_dlm_core_jni_NativeStore_##Name(JNIEnv *env, jclass cls, jlong h, \
         jlong id, jint v) { (void)env; (void)cls; return fn(ST(h), id, v); }
 
 SETTER_INT(nSetPriority, dlm_store_set_priority)
@@ -105,7 +105,7 @@ SETTER_INT(nSetAutostart, dlm_store_set_autostart)
 SETTER_INT(nSetForce, dlm_store_set_force)
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nSetPosition(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nSetPosition(JNIEnv *env, jclass cls, jlong h,
         jlong id, jlong pos)
 {
     (void)env; (void)cls;
@@ -113,7 +113,7 @@ Java_com_dlm_core_jni_NativeStore_nSetPosition(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nSetPackage(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nSetPackage(JNIEnv *env, jclass cls, jlong h,
         jlong id, jlong pkg)
 {
     (void)env; (void)cls;
@@ -121,7 +121,7 @@ Java_com_dlm_core_jni_NativeStore_nSetPackage(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nSetList(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nSetList(JNIEnv *env, jclass cls, jlong h,
         jlong id, jstring list)
 {
     (void)cls;
@@ -132,7 +132,7 @@ Java_com_dlm_core_jni_NativeStore_nSetList(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nDelete(JNIEnv *env, jclass cls, jlong h, jlong id)
+Java_guru_freberg_dlm_core_jni_NativeStore_nDelete(JNIEnv *env, jclass cls, jlong h, jlong id)
 {
     (void)env; (void)cls;
     return dlm_store_delete(ST(h), id);
@@ -208,7 +208,7 @@ static void row_cb(void *ud, const dlm_store_row *r)
 }
 
 JNIEXPORT jobjectArray JNICALL
-Java_com_dlm_core_jni_NativeStore_nLoadAll(JNIEnv *env, jclass cls, jlong h)
+Java_guru_freberg_dlm_core_jni_NativeStore_nLoadAll(JNIEnv *env, jclass cls, jlong h)
 {
     (void)cls;
     row_ctx ctx = { env, NULL, 0, 0, 0 };
@@ -236,7 +236,7 @@ Java_com_dlm_core_jni_NativeStore_nLoadAll(JNIEnv *env, jclass cls, jlong h)
 /* ---- packages --------------------------------------------------------- */
 
 JNIEXPORT jlong JNICALL
-Java_com_dlm_core_jni_NativeStore_nPkgAdd(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nPkgAdd(JNIEnv *env, jclass cls, jlong h,
         jstring name, jstring folder, jstring comment, jstring list,
         jint priority, jlong position, jlong createdAt)
 {
@@ -250,7 +250,7 @@ Java_com_dlm_core_jni_NativeStore_nPkgAdd(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nPkgUpdate(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nPkgUpdate(JNIEnv *env, jclass cls, jlong h,
         jlong id, jstring name, jstring folder, jstring comment, jint priority,
         jint collapsed)
 {
@@ -263,7 +263,7 @@ Java_com_dlm_core_jni_NativeStore_nPkgUpdate(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nPkgSetList(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nPkgSetList(JNIEnv *env, jclass cls, jlong h,
         jlong id, jstring list)
 {
     (void)cls;
@@ -274,7 +274,7 @@ Java_com_dlm_core_jni_NativeStore_nPkgSetList(JNIEnv *env, jclass cls, jlong h,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nPkgSetPosition(JNIEnv *env, jclass cls,
+Java_guru_freberg_dlm_core_jni_NativeStore_nPkgSetPosition(JNIEnv *env, jclass cls,
         jlong h, jlong id, jlong pos)
 {
     (void)env; (void)cls;
@@ -282,7 +282,7 @@ Java_com_dlm_core_jni_NativeStore_nPkgSetPosition(JNIEnv *env, jclass cls,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_dlm_core_jni_NativeStore_nPkgDelete(JNIEnv *env, jclass cls, jlong h,
+Java_guru_freberg_dlm_core_jni_NativeStore_nPkgDelete(JNIEnv *env, jclass cls, jlong h,
         jlong id)
 {
     (void)env; (void)cls;
@@ -345,7 +345,7 @@ static void pkg_cb(void *ud, const dlm_store_pkg_row *r)
 }
 
 JNIEXPORT jobjectArray JNICALL
-Java_com_dlm_core_jni_NativeStore_nLoadPackages(JNIEnv *env, jclass cls, jlong h)
+Java_guru_freberg_dlm_core_jni_NativeStore_nLoadPackages(JNIEnv *env, jclass cls, jlong h)
 {
     (void)cls;
     pkg_ctx ctx = { env, NULL, 0, 0, 0 };
