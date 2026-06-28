@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">dlm</string>
+    <string name="download_channel_name">Downloads</string>
+    <string name="download_channel_desc">Ongoing download progress</string>
+</resources>

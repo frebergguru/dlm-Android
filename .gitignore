@@ -1,0 +1,14 @@
+*.iml
+.gradle/
+.idea/
+build/
+local.properties
+.cxx/
+.externalNativeBuild/
+
+# Generated / fetched native dependencies and build artefacts
+/nativeDeps/
+/.deps-build/
+
+# The CA bundle is fetched by scripts/build-deps.sh (placeholder is tracked)
+# app/src/main/assets/cacert.pem

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground: a "segmented download" mark.
+     A 3-segment shaft that fills top-to-bottom (the progressive opacity +
+     gaps evoke dlm's segmented/parallel downloads completing) accelerates into
+     a teal arrowhead landing on a storage shelf. Kept within the safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Shaft segment 1 (top, not yet "filled"). -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.7"
+        android:pathData="M48,20 L60,20 A3,3 0 0 1 63,23 L63,26 A3,3 0 0 1 60,29 L48,29 A3,3 0 0 1 45,26 L45,23 A3,3 0 0 1 48,20 Z" />
+
+    <!-- Shaft segment 2 (middle). -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M48,32 L60,32 A3,3 0 0 1 63,35 L63,38 A3,3 0 0 1 60,41 L48,41 A3,3 0 0 1 45,38 L45,35 A3,3 0 0 1 48,32 Z" />
+
+    <!-- Shaft segment 3 (bottom, fully filled). -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,44 L60,44 A3,3 0 0 1 63,47 L63,50 A3,3 0 0 1 60,53 L48,53 A3,3 0 0 1 45,50 L45,47 A3,3 0 0 1 48,44 Z" />
+
+    <!-- Arrowhead — teal accent gradient. -->
+    <path android:pathData="M32,56 L76,56 L54,82 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="56"
+                android:endX="54" android:endY="82"
+                android:startColor="#73F1E7"
+                android:endColor="#1BBED0" />
+        </aapt:attr>
+    </path>
+
+    <!-- Storage shelf the arrow lands on. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M46,85 L62,85 A2,2 0 0 1 64,87 A2,2 0 0 1 62,89 L46,89 A2,2 0 0 1 44,87 A2,2 0 0 1 46,85 Z" />
+</vector>

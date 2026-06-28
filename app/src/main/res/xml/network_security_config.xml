@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HTTPS only. Cleartext is disabled app-wide; downloads use TLS with the
+     system trust store (the native engine additionally pins a shipped CA
+     bundle via CURLOPT_CAINFO). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

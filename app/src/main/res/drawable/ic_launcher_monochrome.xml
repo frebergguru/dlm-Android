@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome layer for Android 13+ themed ("Material You") icons. Same
+     segmented-download mark, flattened to one solid tintable colour (the
+     system applies its own colour + background). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,20 L60,20 A3,3 0 0 1 63,23 L63,26 A3,3 0 0 1 60,29 L48,29 A3,3 0 0 1 45,26 L45,23 A3,3 0 0 1 48,20 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,32 L60,32 A3,3 0 0 1 63,35 L63,38 A3,3 0 0 1 60,41 L48,41 A3,3 0 0 1 45,38 L45,35 A3,3 0 0 1 48,32 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,44 L60,44 A3,3 0 0 1 63,47 L63,50 A3,3 0 0 1 60,53 L48,53 A3,3 0 0 1 45,50 L45,47 A3,3 0 0 1 48,44 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,56 L76,56 L54,82 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,85 L62,85 A2,2 0 0 1 64,87 A2,2 0 0 1 62,89 L46,89 A2,2 0 0 1 44,87 A2,2 0 0 1 46,85 Z" />
+</vector>
