@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import guru.freberg.dlm.BuildConfig
 import guru.freberg.dlm.ytdlp.YtdlpState
 import guru.freberg.dlm.ui.QueueViewModel
 import kotlinx.coroutines.Dispatchers
@@ -177,7 +178,7 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
             }
 
             Text(
-                "dlm · version ${context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"}",
+                "dlm · version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
