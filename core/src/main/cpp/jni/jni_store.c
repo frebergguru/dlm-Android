@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI: NativeStore — thin wrapper over libdlm's sqlite3 queue store (store.c).
  * The store remains the persisted source of truth; the Kotlin scheduler reads
  * rows through loadAll and mutates them through the per-field setters. */
@@ -212,9 +213,12 @@ Java_guru_freberg_dlm_core_jni_NativeStore_nLoadAll(JNIEnv *env, jclass cls, jlo
 {
     (void)cls;
     row_ctx ctx = { env, NULL, 0, 0, 0 };
-    dlm_store_load_all(ST(h), row_cb, &ctx);
+    int rc = dlm_store_load_all(ST(h), row_cb, &ctx);
 
-    if (ctx.failed) {
+    /* A partial/aborted scan (rc != 0) must not be presented as the complete
+     * queue: returning the rows collected so far would make the scheduler treat
+     * a truncated view as authoritative. Fail the whole load instead. */
+    if (ctx.failed || rc != 0) {
         row_ctx_release(env, &ctx);
         return NULL;
     }
@@ -349,9 +353,11 @@ Java_guru_freberg_dlm_core_jni_NativeStore_nLoadPackages(JNIEnv *env, jclass cls
 {
     (void)cls;
     pkg_ctx ctx = { env, NULL, 0, 0, 0 };
-    dlm_store_pkg_load_all(ST(h), pkg_cb, &ctx);
+    int rc = dlm_store_pkg_load_all(ST(h), pkg_cb, &ctx);
 
-    if (ctx.failed) {
+    /* As in nLoadAll: a partial scan must fail rather than masquerade as the
+     * full package list. */
+    if (ctx.failed || rc != 0) {
         pkg_ctx_release(env, &ctx);
         return NULL;
     }

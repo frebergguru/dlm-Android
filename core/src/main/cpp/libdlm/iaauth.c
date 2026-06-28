@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — Internet Archive authentication / credential storage. */
 #define _POSIX_C_SOURCE 200809L
 #include "dlm/iaauth.h"
@@ -8,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <jansson.h>
+#include <openssl/crypto.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -54,7 +56,9 @@ const char *dlm_ia_mode_str(ia_auth_mode m)
 static void free_secret(char *s)
 {
     if (!s) return;
-    memset(s, 0, strlen(s));
+    /* OPENSSL_cleanse won't be optimised away the way a plain memset-before-free
+     * can be (dead-store elimination). */
+    OPENSSL_cleanse(s, strlen(s));
     free(s);
 }
 
@@ -133,8 +137,8 @@ static int save_root(json_t *ia)
     int rc = json_dumpf(root, fp, JSON_INDENT(2));
     if (fclose(fp) != 0) rc = -1;
     json_decref(root);
-    if (rc != 0) { DLM_ERROR("ia: cannot write %s", tmp); return -1; }
-    if (rename(tmp, path) != 0) { DLM_ERROR("ia: cannot rename config"); return -1; }
+    if (rc != 0) { DLM_ERROR("ia: cannot write %s", tmp); unlink(tmp); return -1; }
+    if (rename(tmp, path) != 0) { DLM_ERROR("ia: cannot rename config"); unlink(tmp); return -1; }
     return 0;
 }
 

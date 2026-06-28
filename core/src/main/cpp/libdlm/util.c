@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — logging and small utility helpers. */
 #define _POSIX_C_SOURCE 200809L
 #include "dlm/dlm.h"
@@ -162,6 +163,11 @@ char *dlm_filename_from_url(const char *url)
         /* sanitise path separators that may survive decoding */
         for (char *c = out; *c; c++)
             if (*c == '/' || *c == '\\') *c = '_';
+        /* A leading '.' (dotfile, or "."/"..") or '-' (option-looking) is risky
+         * once this becomes a basename; neutralise it. Separators are already
+         * gone, so the result can't traverse out of the target directory. This
+         * mirrors sanitize_filename()/sanitize_basename() in the extractors. */
+        if (out[0] == '.' || out[0] == '-') out[0] = '_';
         if (out[0] == '\0') {
             free(out);
             out = dlm_xstrdup("download");

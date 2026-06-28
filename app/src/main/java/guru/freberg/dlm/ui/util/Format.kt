@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui.util
 
 import androidx.compose.material.icons.Icons
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.ui.graphics.vector.ImageVector
+import java.util.Locale
 
 /** Compact human byte size, e.g. "12.3 MiB". */
 fun formatBytes(n: Long): String {
@@ -19,7 +21,7 @@ fun formatBytes(n: Long): String {
     val units = arrayOf("B", "KiB", "MiB", "GiB", "TiB")
     var v = n.toDouble(); var u = 0
     while (v >= 1024 && u < units.size - 1) { v /= 1024; u++ }
-    return if (u == 0) "$n B" else String.format("%.1f %s", v, units[u])
+    return if (u == 0) "$n B" else String.format(Locale.US, "%.1f %s", v, units[u])
 }
 
 /** Remaining-time estimate, e.g. "3m 12s left" / "1h 4m left". Blank when unknown. */

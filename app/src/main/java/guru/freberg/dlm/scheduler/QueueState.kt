@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.scheduler
 
 import guru.freberg.dlm.core.jni.NativeEngine

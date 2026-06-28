@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.core
 
 import androidx.test.ext.junit.runners.AndroidJUnit4

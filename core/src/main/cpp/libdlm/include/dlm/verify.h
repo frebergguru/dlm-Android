@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — file checksum verification. */
 #ifndef DLM_VERIFY_H
 #define DLM_VERIFY_H

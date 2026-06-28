@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.service
 
 import android.app.Notification
@@ -10,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
@@ -20,10 +22,13 @@ import guru.freberg.dlm.repo.QueueRepository
 import guru.freberg.dlm.scheduler.QState
 import guru.freberg.dlm.scheduler.QueueSnapshot
 import guru.freberg.dlm.ui.MainActivity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -67,18 +72,28 @@ class DownloadService : LifecycleService() {
         if (tickJob?.isActive == true) return
         tickJob = lifecycleScope.launch {
             while (isActive) {
-                container.scheduler.tick()
-                val snap = repo.snapshot.value
-                updateForeground(snap)
-                updateLocks(snap)
-                if (!hasWork(snap)) {
-                    if (++idleTicks >= IDLE_TICKS_BEFORE_STOP) {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                        stopSelf()
-                        break
+                try {
+                    container.scheduler.tick()
+                    val snap = repo.snapshot.value
+                    updateForeground(snap)
+                    updateLocks(snap)
+                    if (!hasWork(snap)) {
+                        if (++idleTicks >= IDLE_TICKS_BEFORE_STOP) {
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                            stopSelf()
+                            break
+                        }
+                    } else {
+                        idleTicks = 0
                     }
-                } else {
-                    idleTicks = 0
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (t: Throwable) {
+                    // One bad tick (e.g. a transient native/store error) must not
+                    // kill the loop: that would crash the process and leave the
+                    // wake/wifi locks held with no path to stopSelf(). Log and
+                    // keep ticking.
+                    Log.w(TAG, "tick failed", t)
                 }
                 delay(TICK_MS)
             }
@@ -90,11 +105,24 @@ class DownloadService : LifecycleService() {
         lifecycleScope.launch {
             repo.snapshot.collect { snap ->
                 if (!repo.autoExport || repo.downloadTreeUri() == null) return@collect
-                snap.downloads.filter { it.state == QState.DONE && it.id !in exported }
-                    .forEach { link ->
-                        exported += link.id
-                        if (File(link.outPath).exists()) repo.exportToTree(link.outPath)
+                val pending = snap.downloads.filter { it.state == QState.DONE && it.id !in exported }
+                if (pending.isNotEmpty()) {
+                    // Filesystem checks + SAF copy are blocking; keep them off the
+                    // main thread. Single collector → no concurrent `exported` access.
+                    withContext(Dispatchers.IO) {
+                        for (link in pending) {
+                            if (!File(link.outPath).exists()) {
+                                // Source already gone; mark handled so we don't rescan it forever.
+                                exported += link.id
+                            } else if (runCatching { repo.exportToTree(link.outPath) }.getOrDefault(false)) {
+                                // Only record success, so a transient SAF failure is retried.
+                                exported += link.id
+                            }
+                        }
                     }
+                }
+                // Bound the set: drop ids no longer present in the queue.
+                exported.retainAll(snap.downloads.mapTo(HashSet()) { it.id })
             }
         }
     }
@@ -203,6 +231,7 @@ class DownloadService : LifecycleService() {
     }
 
     private companion object {
+        const val TAG = "DownloadService"
         const val CHANNEL_ID = "downloads"
         const val NOTIF_ID = 1
         const val TICK_MS = 200L

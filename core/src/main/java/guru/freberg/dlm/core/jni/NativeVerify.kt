@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.core.jni
 
 /** MD5/SHA1 verification (verify.c). Result codes match `dlm_verify_*`. */

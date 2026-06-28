@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.repo
 
 import android.content.Context
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Process-wide singleton wiring the native core to the Kotlin scheduler. Built
@@ -27,7 +29,7 @@ class AppContainer private constructor(private val appContext: Context) {
     val scheduler: QueueScheduler
     val repository: QueueRepository
 
-    @Volatile private var loaded = false
+    private val loaded = AtomicBoolean(false)
 
     init {
         StatusCenter.clock = { System.currentTimeMillis() }
@@ -64,16 +66,15 @@ class AppContainer private constructor(private val appContext: Context) {
 
     /** Load persisted queue once (idempotent). */
     fun ensureLoaded() {
-        if (loaded) return
-        // Optimistically claim the load so two concurrent callers can't both launch;
+        // Atomically claim the load so two concurrent callers can't both launch;
         // reset on failure below so a later trigger retries instead of staying stuck.
-        loaded = true
+        if (!loaded.compareAndSet(false, true)) return
         scope.launch {
             StatusCenter.begin("queue-load", "Loading download queue")
             runCatching { scheduler.load() }
                 .onSuccess { StatusCenter.finish("queue-load", true, "Queue loaded") }
                 .onFailure { e ->
-                    loaded = false
+                    loaded.set(false)
                     StatusCenter.finish("queue-load", false, "Queue load failed: ${e.message}")
                 }
         }

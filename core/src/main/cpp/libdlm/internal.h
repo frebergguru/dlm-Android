@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — internal helpers shared across translation units. Not installed. */
 #ifndef DLM_INTERNAL_H
 #define DLM_INTERNAL_H

@@ -97,7 +97,6 @@ dependencies {
 
     implementation(libs.work.runtime.ktx)
     implementation(libs.documentfile)
-    implementation(libs.security.crypto)
 
     // yt-dlp runtime (Python + yt-dlp + ffmpeg). The Python/yt-dlp payload is
     // initialised + auto-updated on first use; see YtdlpManager.

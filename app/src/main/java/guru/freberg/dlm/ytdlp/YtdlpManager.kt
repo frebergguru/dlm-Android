@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ytdlp
 
 import android.content.Context
@@ -42,6 +43,10 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
     val state: StateFlow<YtdlpState> = _state.asStateFlow()
 
     private val initMutex = Mutex()
+    // Serialises every yt-dlp self-update path (foreground ensureReady, the weekly
+    // worker's checkForUpdate, and the background update) — updateYoutubeDL writes
+    // runtime files and is not safe to run concurrently with itself.
+    private val updateMutex = Mutex()
     // Background scope for the (network) version check so it never sits on the
     // user-facing resolve/download path.
     private val bgScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -119,18 +124,20 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
         return last == 0L || System.currentTimeMillis() - last >= WEEK_MS
     }
 
-    private suspend fun runUpdate(): Boolean = withContext(Dispatchers.IO) {
-        StatusCenter.begin(ST_UPDATE, "Updating yt-dlp", "Checking for a newer version…")
-        runCatching {
-            YoutubeDL.getInstance().updateYoutubeDL(appContext)
-            prefs.edit().putLong(KEY_LAST_UPDATE, System.currentTimeMillis()).apply()
-            true
-        }.onSuccess {
-            StatusCenter.finish(ST_UPDATE, true, "yt-dlp is up to date")
-        }.onFailure {
-            StatusCenter.finish(ST_UPDATE, false, friendly(it.message) ?: "Couldn’t check for updates")
-            Log.w(TAG, "yt-dlp update skipped: ${it.message}")
-        }.getOrDefault(false)
+    private suspend fun runUpdate(): Boolean = updateMutex.withLock {
+        withContext(Dispatchers.IO) {
+            StatusCenter.begin(ST_UPDATE, "Updating yt-dlp", "Checking for a newer version…")
+            runCatching {
+                YoutubeDL.getInstance().updateYoutubeDL(appContext)
+                prefs.edit().putLong(KEY_LAST_UPDATE, System.currentTimeMillis()).apply()
+                true
+            }.onSuccess {
+                StatusCenter.finish(ST_UPDATE, true, "yt-dlp is up to date")
+            }.onFailure {
+                StatusCenter.finish(ST_UPDATE, false, friendly(it.message) ?: "Couldn’t check for updates")
+                Log.w(TAG, "yt-dlp update skipped: ${it.message}")
+            }.getOrDefault(false)
+        }
     }
 
     private fun friendly(msg: String?): String? = msg?.take(140)
@@ -147,12 +154,18 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
                     addOption("-J")
                     addOption("--no-warnings")
                     addOption("--no-playlist")
+                    // End-of-options marker: yt-dlp treats everything after "--" as a
+                    // positional URL, so a URL beginning with "-" can't be parsed as a
+                    // flag (e.g. --exec). buildCommand emits commands just before urls.
+                    addCommands(listOf("--"))
                 }
                 val json = YoutubeDL.getInstance().execute(req).out
                 if (json.isBlank()) null
                 else NativeExtract.parseYtdlp(json, url)
             } catch (e: Exception) {
-                Log.e(TAG, "yt-dlp resolve failed for ${redactUrl(url)}", e)
+                // Don't pass the raw exception: youtubedl-android embeds the full
+                // command line (incl. the URL and any query tokens) in its message.
+                Log.e(TAG, "yt-dlp resolve failed for ${redactUrl(url)} (${e.javaClass.simpleName})")
                 null
             }
         }
@@ -175,6 +188,8 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
             if (rateBytesPerSec > 0) addOption("--limit-rate", rateBytesPerSec.toString())
             mergeExt(outPath)?.let { addOption("--merge-output-format", it) }
             addOption("-o", outPath)
+            // End-of-options marker; see resolve(). Prevents URL arg injection.
+            addCommands(listOf("--"))
         }
 
         return withContext(Dispatchers.IO) {
@@ -199,7 +214,7 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
             } catch (e: Exception) {
                 if (isCancelled() || e is YoutubeDL.CanceledException) DLM_ERR_CANCELLED
                 else {
-                    Log.e(TAG, "yt-dlp download failed for ${redactUrl(url)}", e)
+                    Log.e(TAG, "yt-dlp download failed for ${redactUrl(url)} (${e.javaClass.simpleName})")
                     DLM_ERR_NET
                 }
             } finally {

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — sqlite-backed queue persistence. */
 #define _POSIX_C_SOURCE 200809L
 #include "dlm/store.h"

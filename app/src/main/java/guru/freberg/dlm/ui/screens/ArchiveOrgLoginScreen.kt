@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
@@ -53,7 +54,7 @@ fun ArchiveOrgLoginScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onB
     var advanced by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
-    // Decrypting the auth status touches the keystore/disk; keep it off the main thread.
+    // Reading the auth status touches disk (the native credentials file); keep it off the main thread.
     LaunchedEffect(Unit) { status = withContext(Dispatchers.IO) { repo.authStatus() } }
 
     Scaffold(
@@ -92,7 +93,7 @@ fun ArchiveOrgLoginScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onB
                             scope.launch {
                                 val err = withContext(Dispatchers.IO) { repo.loginPassword(email.trim(), password) }
                                 message = err?.let { "Sign-in failed: $it" }
-                                status = repo.authStatus()
+                                status = withContext(Dispatchers.IO) { repo.authStatus() }
                                 if (err == null) password = ""
                                 busy = false
                             }

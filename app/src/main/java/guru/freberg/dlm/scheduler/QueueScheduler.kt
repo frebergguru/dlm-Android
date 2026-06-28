@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.scheduler
 
+import android.util.Log
 import guru.freberg.dlm.core.jni.NativeEngine
 import guru.freberg.dlm.core.jni.NativeExtract
 import guru.freberg.dlm.core.jni.ProgressSink
@@ -523,6 +525,7 @@ class QueueScheduler(
             } catch (t: Throwable) {
                 // Worker blew up (resolver/native failure) — map to a generic error
                 // rc so the item lands in ERROR instead of stalling the queue.
+                Log.w("QueueScheduler", "worker for item ${it.id} failed", t)
                 DLM_ERR_UNKNOWN
             }
             finalizeWorker(it, rc)
@@ -626,11 +629,22 @@ class QueueScheduler(
     }
 
     private fun resolveOut(outPath: String?, url: String): String {
-        if (!outPath.isNullOrEmpty()) {
-            // Absolute paths are used verbatim; bare filenames land in the download dir.
-            return if (File(outPath).isAbsolute) outPath else File(downloadDir(), outPath).path
-        }
-        return File(downloadDir(), NativeExtract.filenameFromUrl(url)).path
+        val raw = if (!outPath.isNullOrEmpty()) outPath else NativeExtract.filenameFromUrl(url)
+        return confineToDownloadDir(raw)
+    }
+
+    /**
+     * Keep the output path inside the download dir. Resolver-supplied filenames are
+     * sanitised natively, but this is a final defense-in-depth guard against path
+     * traversal / absolute-path escapes ("../", "/data/.../auth.json"): anything
+     * that canonicalises outside the dir collapses to its leaf name within it.
+     */
+    private fun confineToDownloadDir(path: String): String {
+        val dir = downloadDir()
+        val dirCanon = dir.canonicalPath
+        val candidate = (if (File(path).isAbsolute) File(path) else File(dir, path)).canonicalPath
+        return if (candidate == dirCanon || candidate.startsWith(dirCanon + File.separator)) candidate
+        else File(dir, File(path).name).path
     }
 
     private fun nowSec(): Long = System.currentTimeMillis() / 1000

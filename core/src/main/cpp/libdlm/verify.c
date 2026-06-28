@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — file checksum verification (md5/sha1 via OpenSSL EVP). */
 #define _POSIX_C_SOURCE 200809L
 #include "dlm/verify.h"
@@ -45,6 +46,9 @@ static int hash_file(const char *path, const EVP_MD *md, char *hex, size_t hexle
 
 int dlm_verify_md5(const char *path, const char *expected_hex)
 {
+    /* expected_hex is NULL when the source (e.g. archive.org) omits a checksum;
+     * treat "nothing to compare against" as an error, not a crash. */
+    if (!expected_hex) return DLM_VERIFY_ERROR;
     char got[33];
     if (hash_file(path, EVP_md5(), got, sizeof got) != 0) return DLM_VERIFY_ERROR;
     return strcasecmp(got, expected_hex) == 0 ? DLM_VERIFY_OK : DLM_VERIFY_MISMATCH;
@@ -52,6 +56,7 @@ int dlm_verify_md5(const char *path, const char *expected_hex)
 
 int dlm_verify_sha1(const char *path, const char *expected_hex)
 {
+    if (!expected_hex) return DLM_VERIFY_ERROR;
     char got[41];
     if (hash_file(path, EVP_sha1(), got, sizeof got) != 0) return DLM_VERIFY_ERROR;
     return strcasecmp(got, expected_hex) == 0 ? DLM_VERIFY_OK : DLM_VERIFY_MISMATCH;

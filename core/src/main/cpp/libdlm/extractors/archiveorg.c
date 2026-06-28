@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — native archive.org extractor.
  *
  * Resolves an archive.org item (details/download/metadata URL) into one task

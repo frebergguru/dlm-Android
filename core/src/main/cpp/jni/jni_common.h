@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Shared helpers for the dlm JNI bridge. */
 #ifndef DLM_JNI_COMMON_H
 #define DLM_JNI_COMMON_H
@@ -28,7 +29,12 @@ static inline char *jstr_dup(JNIEnv *env, jstring js)
 {
     if (!js) return NULL;
     const char *c = (*env)->GetStringUTFChars(env, js, NULL);
-    if (!c) return NULL;
+    if (!c) {
+        /* GetStringUTFChars failed and left a pending OutOfMemoryError; clear it
+         * so callers can safely keep making JNI calls (undefined otherwise). */
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+        return NULL;
+    }
     char *out = strdup(c);
     (*env)->ReleaseStringUTFChars(env, js, c);
     return out;

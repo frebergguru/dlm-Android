@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI: NativeEngine — drives the segmented/resumable download engine
  * (download.c) verbatim. dlm_download_file blocks on the calling thread and
  * invokes the progress callback on that same thread, so the JNIEnv handed to
@@ -33,12 +34,16 @@ static char **headers_dup(JNIEnv *env, jobjectArray arr, int *out_n)
     if (n <= 0) { *out_n = 0; return NULL; }
     char **h = calloc((size_t)n + 1, sizeof *h);
     if (!h) { *out_n = 0; return NULL; }
+    /* Compact past any NULLs (a Java-null element, or an OOM in jstr_dup) so a
+     * mid-array NULL can't truncate the engine's NULL-terminated header walk. */
+    jsize w = 0;
     for (jsize i = 0; i < n; i++) {
         jstring s = (jstring)(*env)->GetObjectArrayElement(env, arr, i);
-        h[i] = jstr_dup(env, s);
+        char *d = jstr_dup(env, s);
         if (s) (*env)->DeleteLocalRef(env, s);
+        if (d) h[w++] = d;
     }
-    *out_n = (int)n;
+    *out_n = (int)w;
     return h;
 }
 

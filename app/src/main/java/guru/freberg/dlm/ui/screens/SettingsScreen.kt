@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui.screens
 
 import android.content.Intent
@@ -57,8 +58,8 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
     var hasFolder by remember { mutableStateOf(repo.downloadTreeUri() != null) }
     var concurrent by remember { mutableFloatStateOf(snap.maxActive.toFloat()) }
 
-    // Resolving the auth status decrypts stored credentials; load it once off the
-    // main thread instead of decrypting on every recomposition.
+    // Resolving the auth status reads the native credentials file from disk; load
+    // it once off the main thread instead of on every recomposition.
     var authStatus by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { authStatus = withContext(Dispatchers.IO) { repo.authStatus() } }
 
@@ -176,7 +177,7 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
             }
 
             Text(
-                "dlm · version ${context.packageManager.getPackageInfo(context.packageName, 0).versionName}",
+                "dlm · version ${context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),

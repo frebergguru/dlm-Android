@@ -1,7 +1,9 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI: NativeAuth — Internet Archive credential storage (iaauth.c). The
  * credentials file lives under the app-private config dir (routed via
- * XDG_CONFIG_HOME in nativeInit); the JVM additionally wraps it with
- * EncryptedFile, so secrets never sit in plaintext on disk. */
+ * XDG_CONFIG_HOME in nativeInit), created mode 0600. NOTE: secrets are stored
+ * as plaintext JSON, protected only by app-private storage permissions — there
+ * is no at-rest encryption layer, so do not claim otherwise. */
 #include "jni_common.h"
 #include "dlm/iaauth.h"
 

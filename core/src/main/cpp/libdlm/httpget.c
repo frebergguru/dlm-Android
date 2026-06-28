@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — small HTTP GET/POST-to-memory helper used by extractors and auth. */
 #define _POSIX_C_SOURCE 200809L
 #include "httpget.h"
@@ -47,6 +48,11 @@ int dlm_http_request(const char *url, const char *post_fields,
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_MAXREDIRS, 20L);
+    /* Extractor/auth traffic is archive.org over HTTPS and may carry the IA
+     * session cookie / S3 key; lock protocols down and never let a redirect
+     * downgrade to cleartext. */
+    curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, "http,https");
+    curl_easy_setopt(c, CURLOPT_REDIR_PROTOCOLS_STR, "https");
     curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(c, CURLOPT_USERAGENT, HTTPGET_UA);
     { const char *ca = dlm_ca_bundle(); if (ca) curl_easy_setopt(c, CURLOPT_CAINFO, ca); }

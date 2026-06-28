@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui.util
 
 /**
@@ -24,6 +25,27 @@ fun detectUrl(text: String?): String? {
     return token.ifEmpty { null }
 }
 
+// Schemes we refuse to hand to the resolver / native curl engine: local-file,
+// IPC and script vectors. http(s)/ftp(s)/magnet and schemeless host-like input
+// (which yt-dlp/curl resolve to https) are fine.
+private val BLOCKED_SCHEMES = listOf(
+    "file:", "content:", "intent:", "javascript:", "data:", "blob:", "about:", "jar:",
+)
+
+/**
+ * Reject obviously-unsafe download input before it reaches yt-dlp / libcurl:
+ * option-injection (a leading '-', which yt-dlp would parse as a CLI flag such as
+ * `--exec`) and non-network schemes. Lenient on schemeless input so yt-dlp's
+ * host-only URLs keep working. Defense-in-depth alongside the `--` argument
+ * separator and curl's CURLOPT_PROTOCOLS restriction.
+ */
+fun isSafeDownloadInput(text: String?): Boolean {
+    val t = text?.trim() ?: return false
+    if (t.isEmpty() || t.startsWith("-")) return false
+    val lower = t.lowercase()
+    return BLOCKED_SCHEMES.none { lower.startsWith(it) }
+}
+
 /**
  * Bare host of [url] for site grouping. Mirrors `host_of()`: strips the scheme
  * (`://`), userinfo (`user@`), then takes up to the first `/ : ? #`, lowercased,
@@ -34,9 +56,13 @@ fun hostOf(url: String?): String {
     if (url.isNullOrEmpty()) return ""
     val schemeIdx = url.indexOf("://")
     val rest = if (schemeIdx >= 0) url.substring(schemeIdx + 3) else url
-    val slash = rest.indexOf('/')
+    // The authority ends at the first '/', '?' or '#'. A '@' is userinfo only
+    // when it falls inside that authority; a '@' in a query/fragment (or in a
+    // schemeless magnet's query) must not be mistaken for a userinfo delimiter.
+    val authEnd = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
+        .let { if (it < 0) rest.length else it }
     val at = rest.indexOf('@')
-    val start = if (at >= 0 && (slash < 0 || at < slash)) at + 1 else 0
+    val start = if (at in 0 until authEnd) at + 1 else 0
     val sb = StringBuilder()
     var i = start
     while (i < rest.length) {

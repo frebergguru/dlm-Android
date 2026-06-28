@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI: rate parsing/formatting (NativeLib) — reused so Android accepts the same
  * "500k"/"2M" syntax as the CLI. */
 #include "jni_common.h"

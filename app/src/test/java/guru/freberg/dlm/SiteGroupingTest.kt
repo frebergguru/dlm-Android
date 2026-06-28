@@ -1,11 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm
 
 import guru.freberg.dlm.ui.util.detectUrl
 import guru.freberg.dlm.ui.util.faviconUrl
 import guru.freberg.dlm.ui.util.hostOf
+import guru.freberg.dlm.ui.util.isSafeDownloadInput
 import guru.freberg.dlm.ui.util.siteLabel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -58,6 +62,14 @@ class SiteGroupingTest {
 
     @Test fun hostOf_magnetYieldsMagnet() {
         assertEquals("magnet", hostOf("magnet:?xt=urn:btih:HASH&dn=name"))
+        // an '@' inside the magnet's query must not be treated as userinfo
+        assertEquals("magnet", hostOf("magnet:?xt=urn:btih:HASH&dn=John@Doe"))
+    }
+
+    @Test fun hostOf_ignoresAtInQueryOrFragment() {
+        // '@' in the query/fragment (no path) is not userinfo
+        assertEquals("example.com", hostOf("https://example.com?redirect=user@host"))
+        assertEquals("example.com", hostOf("https://example.com#x@y"))
     }
 
     @Test fun hostOf_emptyForBlank() {
@@ -77,6 +89,32 @@ class SiteGroupingTest {
         assertEquals("Magnet links", siteLabel("magnet"))
         assertEquals("Other links", siteLabel(""))
         assertEquals("example.com", siteLabel("example.com"))
+    }
+
+    @Test fun isSafeDownloadInput_allowsRealLinks() {
+        assertTrue(isSafeDownloadInput("https://a.com/x"))
+        assertTrue(isSafeDownloadInput("http://a.com"))
+        assertTrue(isSafeDownloadInput("ftp://a.com/f"))
+        assertTrue(isSafeDownloadInput("magnet:?xt=urn:btih:HASH"))
+        // schemeless host-like input stays allowed (yt-dlp/curl resolve it)
+        assertTrue(isSafeDownloadInput("youtube.com/watch?v=x"))
+        assertTrue(isSafeDownloadInput("  https://a.com/x  "))
+    }
+
+    @Test fun isSafeDownloadInput_blocksInjectionAndBadSchemes() {
+        // yt-dlp option injection
+        assertFalse(isSafeDownloadInput("--exec=sh -c 'id'"))
+        assertFalse(isSafeDownloadInput("-o/data/x"))
+        // local-file / IPC / script schemes (case-insensitive)
+        assertFalse(isSafeDownloadInput("file:///etc/passwd"))
+        assertFalse(isSafeDownloadInput("FILE:///etc/passwd"))
+        assertFalse(isSafeDownloadInput("content://settings/secure"))
+        assertFalse(isSafeDownloadInput("intent://x#Intent;end"))
+        assertFalse(isSafeDownloadInput("javascript:alert(1)"))
+        assertFalse(isSafeDownloadInput("data:text/html,x"))
+        // empties
+        assertFalse(isSafeDownloadInput(null))
+        assertFalse(isSafeDownloadInput("   "))
     }
 
     @Test fun faviconUrl_realHostsOnly() {

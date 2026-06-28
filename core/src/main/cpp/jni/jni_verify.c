@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI: NativeVerify — MD5/SHA1 checksum verification (verify.c). */
 #include "jni_common.h"
 #include "dlm/verify.h"

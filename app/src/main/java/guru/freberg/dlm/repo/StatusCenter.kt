@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.repo
 
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +48,7 @@ object StatusCenter {
         upsert(key, cur?.title ?: key, detail, if (ok) StatusState.DONE else StatusState.FAILED, null)
     }
 
+    @Synchronized
     fun clearFinished() {
         _items.value = _items.value.filter { it.state == StatusState.RUNNING }
     }

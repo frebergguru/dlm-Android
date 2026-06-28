@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI lifecycle: cache model classes, route XDG/CA config into the C core. */
 #include "jni_common.h"
 #include "dlm/dlm.h"
@@ -13,7 +14,12 @@ dlm_jni_cache g_jni;
 static jclass global_ref(JNIEnv *env, const char *name)
 {
     jclass local = (*env)->FindClass(env, name);
-    if (!local) return NULL;
+    if (!local) {
+        /* FindClass threw (e.g. NoClassDefFoundError); clear it so we don't
+         * return from JNI_OnLoad with a pending exception (undefined per spec). */
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+        return NULL;
+    }
     jclass global = (*env)->NewGlobalRef(env, local);
     (*env)->DeleteLocalRef(env, local);
     return global;
@@ -32,8 +38,10 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
     g_jni.extractResult = global_ref(env, "guru/freberg/dlm/core/model/ExtractResult");
     g_jni.progressSink = global_ref(env, "guru/freberg/dlm/core/jni/ProgressSink");
     if (!g_jni.storeRow || !g_jni.pkgRow || !g_jni.task ||
-        !g_jni.extractResult || !g_jni.progressSink)
+        !g_jni.extractResult || !g_jni.progressSink) {
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
         return JNI_ERR;
+    }
 
     g_jni.storeRowCtor = (*env)->GetMethodID(env, g_jni.storeRow, "<init>",
         "(JLjava/lang/String;Ljava/lang/String;IIJJLjava/lang/String;"
@@ -50,8 +58,10 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
     g_jni.progressOnProgress = (*env)->GetMethodID(env, g_jni.progressSink,
         "onProgress", "(JJD)V");
     if (!g_jni.storeRowCtor || !g_jni.pkgRowCtor || !g_jni.taskCtor ||
-        !g_jni.extractResultCtor || !g_jni.progressOnProgress)
+        !g_jni.extractResultCtor || !g_jni.progressOnProgress) {
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
         return JNI_ERR;
+    }
 
     return JNI_VERSION_1_6;
 }

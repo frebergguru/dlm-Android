@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui
 
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import guru.freberg.dlm.ui.util.detectUrl
+import guru.freberg.dlm.ui.util.isSafeDownloadInput
 
 /** Paste or auto-fill a link, then add it for review (default) or download now. */
 @Composable
@@ -63,7 +65,7 @@ fun AddUrlDialog(
                 )
             }
         },
-        confirmButton = { TextButton(enabled = url.isNotBlank(), onClick = { onCrawl(url) }) { Text("Add") } },
-        dismissButton = { TextButton(enabled = url.isNotBlank(), onClick = { onAddDirect(url) }) { Text("Download now") } },
+        confirmButton = { TextButton(enabled = isSafeDownloadInput(url), onClick = { onCrawl(url.trim()) }) { Text("Add") } },
+        dismissButton = { TextButton(enabled = isSafeDownloadInput(url), onClick = { onAddDirect(url.trim()) }) { Text("Download now") } },
     )
 }

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — extractor dispatch.
  *
  * Routes a URL to the right extractor. archive.org is handled natively; any

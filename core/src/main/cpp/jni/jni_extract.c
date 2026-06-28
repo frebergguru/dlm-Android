@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* JNI: NativeExtract — native URL resolution (archive.org + direct files) and
  * the verbatim yt-dlp JSON parser. Anything the native side can't resolve is
  * flagged needsYtdlp so the JVM YtdlpManager takes over. */
@@ -40,7 +41,10 @@ static jobject task_to_jobject(JNIEnv *env, const dlm_task *t)
     jstring fn = jstr_new(env, t->filename);
     jstring md5 = jstr_new(env, t->md5);
     jstring sha1 = jstr_new(env, t->sha1);
-    jobjectArray hdrs = headers_to_jarray(env, t->headers);
+    /* If a prior jstr_new left a pending exception, skip headers_to_jarray: it
+     * calls FindClass, which is unsafe to invoke with an exception pending. */
+    jobjectArray hdrs = (*env)->ExceptionCheck(env) ? NULL :
+        headers_to_jarray(env, t->headers);
     /* hdrs may be NULL legitimately (no headers); only a pending exception from
      * the prior allocations means we must not call NewObject. */
     jobject o = (*env)->ExceptionCheck(env) ? NULL :

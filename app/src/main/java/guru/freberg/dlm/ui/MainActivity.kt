@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui
 
 import android.Manifest
@@ -8,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -71,11 +73,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         maybeRequestNotifications()
-        sharedUrl.value = extractSharedUrl(intent)
+        // Only extract on a fresh start; on recreation (e.g. rotation) the intent
+        // is unchanged and re-reading it would re-pop the Add dialog.
+        if (savedInstanceState == null) sharedUrl.value = extractSharedUrl(intent)
 
         setContent {
             DlmTheme {
-                AppRoot(vm, sharedUrl.value, clipboardUrl.value)
+                AppRoot(
+                    vm, sharedUrl.value, clipboardUrl.value,
+                    onSharedConsumed = { sharedUrl.value = null },
+                )
             }
         }
     }
@@ -140,7 +147,12 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppRoot(vm: QueueViewModel, sharedUrl: String?, clipboardUrl: String?) {
+private fun AppRoot(
+    vm: QueueViewModel,
+    sharedUrl: String?,
+    clipboardUrl: String?,
+    onSharedConsumed: () -> Unit,
+) {
     var screen by rememberSaveable { mutableStateOf(Screen.DOWNLOADS) }
     var prefillUrl by remember { mutableStateOf(sharedUrl) }
     var showAdd by remember { mutableStateOf(sharedUrl != null) }
@@ -155,6 +167,9 @@ private fun AppRoot(vm: QueueViewModel, sharedUrl: String?, clipboardUrl: String
         if (sharedUrl != null) {
             prefillUrl = sharedUrl
             showAdd = true
+            // Clear the source so onWindowFocusChanged's shared-link guard doesn't
+            // stay latched and disable clipboard detection for the rest of the session.
+            onSharedConsumed()
         }
     }
 
@@ -168,6 +183,12 @@ private fun AppRoot(vm: QueueViewModel, sharedUrl: String?, clipboardUrl: String
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         vm.messages.collect { scope.launch { snackbar.showSnackbar(it) } }
+    }
+
+    // System Back should navigate within the app (sub-screens have no bottom-bar
+    // entry, only a TopAppBar arrow) instead of finishing the Activity.
+    BackHandler(enabled = screen != Screen.DOWNLOADS) {
+        screen = if (screen == Screen.AUTH) Screen.SETTINGS else Screen.DOWNLOADS
     }
 
     Scaffold(

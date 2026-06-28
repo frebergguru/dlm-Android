@@ -75,6 +75,14 @@ target_include_directories(dlmcore PRIVATE
 # segment offsets silently truncate.
 target_compile_definitions(dlmcore PRIVATE _FILE_OFFSET_BITS=64 _LARGEFILE_SOURCE)
 
+# Hardening: this library parses untrusted network input (HTML/JSON via pcre2,
+# the archive.org/ytdlp extractors, curl/openssl). Stack canaries + fortified
+# libc calls at compile time; RELRO/BIND_NOW + non-exec stack at link time.
+# _FORTIFY_SOURCE is only meaningful with optimisation, so skip it in Debug.
+target_compile_options(dlmcore PRIVATE -fstack-protector-strong)
+target_compile_options(dlmcore PRIVATE $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+target_link_options(dlmcore PRIVATE -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack)
+
 target_compile_definitions(dlmcore PRIVATE PCRE2_CODE_UNIT_WIDTH=8)
 # Keep the bundled SQLite lean; the queue store uses a small, standard subset.
 set_source_files_properties(sqlite/sqlite3.c PROPERTIES COMPILE_OPTIONS "-w")

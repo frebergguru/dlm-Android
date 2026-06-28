@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — yt-dlp extractor.
  *
  * For any URL not handled natively, we shell out to yt-dlp to resolve the page
@@ -121,12 +122,15 @@ static int task_from_info(json_t *info, const char *input_url, dlm_task *t)
     int junk_ext = !ext || !*ext || strcmp(ext, "unknown") == 0 ||
                    strcmp(ext, "unknown_video") == 0;
 
-    /* filename: <title>.<ext> */
+    /* filename: <title>.<ext>. Sanitise BOTH parts — ext comes straight from the
+     * yt-dlp JSON and an attacker value containing '/' would otherwise traverse. */
     char *base = sanitize_filename(title ? title : "download");
-    size_t fnlen = strlen(base) + (ext ? strlen(ext) : 3) + 2;
+    char *sext = sanitize_filename(ext && *ext ? ext : "bin");
+    size_t fnlen = strlen(base) + strlen(sext) + 2;
     t->filename = dlm_xmalloc(fnlen);
-    snprintf(t->filename, fnlen, "%s.%s", base, ext ? ext : "bin");
+    snprintf(t->filename, fnlen, "%s.%s", base, sext);
     free(base);
+    free(sext);
 
     int fragmented = is_fragmented_proto(proto) ||
                      (json_is_array(reqf) && json_array_size(reqf) > 1) ||

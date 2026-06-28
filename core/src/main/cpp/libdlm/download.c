@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* libdlm — segmented HTTP(S) downloader with resume.
  *
  * Strategy:
@@ -142,6 +143,21 @@ static void apply_common_opts(CURL *c, dlm_download_t *dl)
     curl_easy_setopt(c, CURLOPT_URL, dl->url);
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_MAXREDIRS, 20L);
+    /* Restrict to the schemes we actually download; blocks file://, gopher://,
+     * dict://, scp://, smb:// etc. on both the initial request and redirects
+     * (defends against local-file disclosure and SSRF via attacker URLs). */
+    curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, "http,https,ftp,ftps");
+    {
+        /* archive.org credentials (S3 key / session cookie) are attached as fixed
+         * headers, which libcurl resends on every redirect hop. If this request
+         * carries them, forbid a redirect from downgrading to cleartext http. */
+        int has_auth = 0;
+        for (struct curl_slist *h = dl->header_list; h; h = h->next)
+            if (strncasecmp(h->data, "Authorization:", 14) == 0 ||
+                strncasecmp(h->data, "Cookie:", 7) == 0) { has_auth = 1; break; }
+        curl_easy_setopt(c, CURLOPT_REDIR_PROTOCOLS_STR,
+                         has_auth ? "https" : "http,https,ftp,ftps");
+    }
     curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(c, CURLOPT_USERAGENT, DLM_UA);
     { const char *ca = dlm_ca_bundle(); if (ca) curl_easy_setopt(c, CURLOPT_CAINFO, ca); }

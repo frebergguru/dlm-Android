@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.repo
 
 import android.content.Context
@@ -13,7 +14,9 @@ import guru.freberg.dlm.scheduler.QueueScheduler
 import guru.freberg.dlm.scheduler.QueueSnapshot
 import guru.freberg.dlm.service.DownloadService
 import guru.freberg.dlm.ytdlp.YtdlpManager
+import guru.freberg.dlm.ytdlp.YtdlpState
 import guru.freberg.dlm.core.jni.NativeAuth
+import guru.freberg.dlm.core.jni.NativeExtract
 import guru.freberg.dlm.core.model.Task
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,15 +83,20 @@ class QueueRepository(
     }
 
     private suspend fun resolveTasks(url: String): List<Task>? {
+        // Boundary guard: never hand option-injection / non-network-scheme input to
+        // the native engine or yt-dlp, regardless of which UI path called us.
+        if (!guru.freberg.dlm.ui.util.isSafeDownloadInput(url)) return null
         val label = runCatching { Uri.parse(url).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: url
         _resolving.update { it + label }
         try {
             // archive.org/direct resolution hits the network in libcurl — keep it
             // off the main thread. yt-dlp resolution already runs on IO internally.
-            val native = withContext(Dispatchers.IO) { guru.freberg.dlm.core.jni.NativeExtract.extract(url) }
+            val native = withContext(Dispatchers.IO) { NativeExtract.extract(url) }
             if (!native.needsYtdlp) return native.tasks.toList()
-            val res = ytdlp.resolve(url) ?: return null
-            return res.tasks.toList()
+            ytdlp.resolve(url)?.let { return it.tasks.toList() }
+            // yt-dlp couldn't resolve it — fall back to a plain direct download so
+            // generic files (unrecognised extension / unsupported site) still work.
+            return directFallback(url)
         } finally {
             // Remove a single occurrence (two adds of the same host stay balanced).
             _resolving.update { list ->
@@ -96,6 +104,29 @@ class QueueRepository(
                 if (i < 0) list else list.toMutableList().also { it.removeAt(i) }
             }
         }
+    }
+
+    /**
+     * Last-resort resolution for URLs yt-dlp rejects: treat the URL as a single
+     * generic file and let the segmented engine fetch it directly (delegate = 0).
+     *
+     * Gated on the yt-dlp runtime being READY: a null from [YtdlpManager.resolve]
+     * only means "unsupported URL" once yt-dlp actually ran. If it isn't set up
+     * yet, a null is ambiguous, and blindly downloading would save a media page's
+     * HTML instead of erroring — so we don't fall back in that case. http/https
+     * only, since the engine probes with an HTTP HEAD/Range request.
+     */
+    private fun directFallback(url: String): List<Task>? {
+        if (ytdlp.state.value != YtdlpState.READY) return null
+        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+        if (scheme != "http" && scheme != "https") return null
+        return listOf(
+            Task(
+                url = url,
+                filename = NativeExtract.filenameFromUrl(url),
+                size = -1, md5 = null, sha1 = null, headers = null, delegate = 0,
+            ),
+        )
     }
 
     private fun Task.toGrabLink() = GrabLink(
