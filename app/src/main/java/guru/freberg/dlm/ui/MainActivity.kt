@@ -1,6 +1,8 @@
 package guru.freberg.dlm.ui
 
 import android.Manifest
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -51,6 +53,11 @@ class MainActivity : ComponentActivity() {
     // Observable so a re-shared link delivered via onNewIntent recomposes the UI.
     private val sharedUrl = mutableStateOf<String?>(null)
 
+    // A link detected on the clipboard when the app comes to the foreground.
+    private val clipboardUrl = mutableStateOf<String?>(null)
+    // The last clipboard link we offered, so the same copy isn't proposed twice.
+    private var lastClipHandled: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -59,7 +66,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             DlmTheme {
-                AppRoot(vm, sharedUrl.value)
+                AppRoot(vm, sharedUrl.value, clipboardUrl.value)
             }
         }
     }
@@ -68,6 +75,23 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         sharedUrl.value = extractSharedUrl(intent)
+    }
+
+    // Clipboard access requires the window to have focus, so detect here rather
+    // than in onResume. A shared/opened link always takes precedence.
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus || sharedUrl.value != null) return
+        val clip = detectClipboardUrl() ?: return
+        if (clip == lastClipHandled) return
+        lastClipHandled = clip
+        clipboardUrl.value = clip
+    }
+
+    private fun detectClipboardUrl(): String? {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
+        val clip = cm.primaryClip?.takeIf { it.itemCount > 0 } ?: return null
+        return httpUrlOrNull(clip.getItemAt(0)?.coerceToText(this)?.toString())
     }
 
     private fun maybeRequestNotifications() {
@@ -79,18 +103,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun extractSharedUrl(intent: Intent?): String? = when (intent?.action) {
-        Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
-        Intent.ACTION_VIEW -> intent.dataString
-        else -> null
-    }?.trim()?.takeIf {
-        android.net.Uri.parse(it).scheme?.lowercase() in setOf("http", "https")
+    private fun extractSharedUrl(intent: Intent?): String? = httpUrlOrNull(
+        when (intent?.action) {
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            Intent.ACTION_VIEW -> intent.dataString
+            else -> null
+        }
+    )
+
+    private fun httpUrlOrNull(raw: String?): String? = raw?.trim()?.takeIf {
+        it.isNotEmpty() && android.net.Uri.parse(it).scheme?.lowercase() in setOf("http", "https")
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppRoot(vm: QueueViewModel, sharedUrl: String?) {
+private fun AppRoot(vm: QueueViewModel, sharedUrl: String?, clipboardUrl: String?) {
     var screen by rememberSaveable { mutableStateOf(Screen.DOWNLOADS) }
     var prefillUrl by remember { mutableStateOf(sharedUrl) }
     var showAdd by remember { mutableStateOf(sharedUrl != null) }
@@ -104,6 +132,14 @@ private fun AppRoot(vm: QueueViewModel, sharedUrl: String?) {
     androidx.compose.runtime.LaunchedEffect(sharedUrl) {
         if (sharedUrl != null) {
             prefillUrl = sharedUrl
+            showAdd = true
+        }
+    }
+
+    // Offer a link detected on the clipboard when the app is foregrounded.
+    androidx.compose.runtime.LaunchedEffect(clipboardUrl) {
+        if (clipboardUrl != null && !showAdd) {
+            prefillUrl = clipboardUrl
             showAdd = true
         }
     }
