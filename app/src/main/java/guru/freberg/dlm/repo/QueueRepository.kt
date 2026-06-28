@@ -158,6 +158,10 @@ class QueueRepository(
         get() = settings.autoExport
         set(v) { settings.autoExport = v }
 
+    var clipboardMonitor: Boolean
+        get() = settings.clipboardMonitor
+        set(v) { settings.clipboardMonitor = v }
+
     suspend fun exportToTree(outPath: String): Boolean {
         val uri = settings.downloadTreeUri ?: return false
         return SafMover.export(appContext, Uri.parse(uri), File(outPath))

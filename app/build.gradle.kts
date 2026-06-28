@@ -92,6 +92,9 @@ dependencies {
     implementation(libs.compose.material.icons)
     implementation(libs.navigation.compose)
 
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
     implementation(libs.work.runtime.ktx)
     implementation(libs.documentfile)
     implementation(libs.security.crypto)

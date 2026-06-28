@@ -5,11 +5,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import guru.freberg.dlm.repo.AppContainer
 import guru.freberg.dlm.scheduler.MoveDir
+import guru.freberg.dlm.ui.util.hostOf
 import guru.freberg.dlm.ytdlp.YtdlpState
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** Linkgrabber grouping; order matches the desktop GROUP_* enum and the
+ * selector. The first entry is the default. */
+enum class GroupMode { SITE_PKG, SITE, PKG }
 
 /** Drives every screen: exposes the reactive queue snapshot and forwards user
  * actions to the repository. */
@@ -26,6 +34,59 @@ class QueueViewModel(app: Application) : AndroidViewModel(app) {
     val messages: SharedFlow<String> = _messages
 
     private fun notify(msg: String) { _messages.tryEmit(msg) }
+
+    // ---- clipboard monitor ------------------------------------------------
+
+    private val _clipboardMonitor = MutableStateFlow(repo.clipboardMonitor)
+    /** Whether copied links auto-stage into the linkgrabber (foreground only). */
+    val clipboardMonitor: StateFlow<Boolean> = _clipboardMonitor.asStateFlow()
+
+    fun setClipboardMonitor(on: Boolean) {
+        repo.clipboardMonitor = on
+        _clipboardMonitor.value = on
+    }
+
+    // The last URL auto-grabbed from the clipboard, so the same copy (some apps
+    // re-set the clipboard on focus) isn't staged twice. Mirrors `clip_last`.
+    private var lastAutoGrabbed: String? = null
+
+    /** Stage a newly-copied [url] into the linkgrabber, ignoring a repeat of the
+     * last one. Called by the foreground clipboard listener. */
+    fun autoGrab(url: String) {
+        val u = url.trim()
+        if (u.isEmpty() || u == lastAutoGrabbed) return
+        lastAutoGrabbed = u
+        crawl(u)
+    }
+
+    // ---- linkgrabber site grouping (client-side UI state) -----------------
+
+    private val _groupMode = MutableStateFlow(GroupMode.SITE_PKG)
+    val groupMode: StateFlow<GroupMode> = _groupMode.asStateFlow()
+    fun setGroupMode(mode: GroupMode) { _groupMode.value = mode }
+
+    private val _collapsedSites = MutableStateFlow<Set<String>>(emptySet())
+    /** Hosts the user has collapsed in the linkgrabber (per-host, in memory). */
+    val collapsedSites: StateFlow<Set<String>> = _collapsedSites.asStateFlow()
+    fun toggleSiteCollapsed(host: String) = _collapsedSites.update {
+        if (host in it) it - host else it + host
+    }
+
+    private val _failedFavicons = MutableStateFlow<Set<String>>(emptySet())
+    /** Hosts whose favicon fetch failed; shown with the globe and never refetched. */
+    val failedFavicons: StateFlow<Set<String>> = _failedFavicons.asStateFlow()
+    fun markFaviconFailed(host: String) = _failedFavicons.update { it + host }
+
+    /** Confirm every linkgrabber link whose host matches [host] into the queue,
+     * started. Mirrors the desktop "confirm all from this site". */
+    fun confirmSite(host: String) = viewModelScope.launch {
+        val links = snapshot.value.linkgrabber.filter { hostOf(it.url) == host }
+        for (link in links) repo.confirm(link.id, false, true)
+        notify(
+            if (links.isEmpty()) "Nothing to confirm"
+            else "Confirmed ${links.size} link${if (links.size == 1) "" else "s"}",
+        )
+    }
 
     // ---- adding -----------------------------------------------------------
 

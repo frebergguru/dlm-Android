@@ -29,11 +29,18 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_EXPORT, false)
         set(v) = prefs.edit { putBoolean(KEY_AUTO_EXPORT, v) }
 
+    /** Auto-stage copied links into the linkgrabber while the app is foregrounded
+     * (Android 10+ blocks background clipboard reads). Off by default. */
+    var clipboardMonitor: Boolean
+        get() = prefs.getBoolean(KEY_CLIPBOARD_MONITOR, false)
+        set(v) = prefs.edit { putBoolean(KEY_CLIPBOARD_MONITOR, v) }
+
     private companion object {
         const val KEY_MAX_ACTIVE = "max_active"
         const val KEY_MAX_SPEED = "max_speed"
         const val KEY_GLOBAL_AUTOSTART = "global_autostart"
         const val KEY_TREE_URI = "download_tree_uri"
         const val KEY_AUTO_EXPORT = "auto_export"
+        const val KEY_CLIPBOARD_MONITOR = "clipboard_monitor"
     }
 }

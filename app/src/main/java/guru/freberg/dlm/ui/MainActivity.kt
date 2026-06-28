@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import guru.freberg.dlm.ui.util.detectUrl
 import guru.freberg.dlm.ui.screens.ArchiveOrgLoginScreen
 import guru.freberg.dlm.ui.screens.DownloadsScreen
 import guru.freberg.dlm.ui.screens.LinkgrabberScreen
@@ -58,6 +59,14 @@ class MainActivity : ComponentActivity() {
     // The last clipboard link we offered, so the same copy isn't proposed twice.
     private var lastClipHandled: String? = null
 
+    // Watches the clipboard while the app is foregrounded (Android 10+ blocks
+    // background reads); active only when the clipboard-monitor setting is on.
+    private val clipManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager }
+    private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
+        if (!vm.clipboardMonitor.value) return@OnPrimaryClipChangedListener
+        detectClipboardUrl()?.let { vm.autoGrab(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -77,21 +86,34 @@ class MainActivity : ComponentActivity() {
         sharedUrl.value = extractSharedUrl(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        clipManager?.addPrimaryClipChangedListener(clipListener)
+    }
+
+    override fun onStop() {
+        clipManager?.removePrimaryClipChangedListener(clipListener)
+        super.onStop()
+    }
+
     // Clipboard access requires the window to have focus, so detect here rather
     // than in onResume. A shared/opened link always takes precedence.
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (!hasFocus || sharedUrl.value != null) return
         val clip = detectClipboardUrl() ?: return
+        // With the monitor on, silently stage the link from both paths instead of
+        // popping the Add dialog (covers links copied while the app was away).
+        if (vm.clipboardMonitor.value) { vm.autoGrab(clip); return }
         if (clip == lastClipHandled) return
         lastClipHandled = clip
         clipboardUrl.value = clip
     }
 
     private fun detectClipboardUrl(): String? {
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
+        val cm = clipManager ?: return null
         val clip = cm.primaryClip?.takeIf { it.itemCount > 0 } ?: return null
-        return httpUrlOrNull(clip.getItemAt(0)?.coerceToText(this)?.toString())
+        return detectUrl(clip.getItemAt(0)?.coerceToText(this)?.toString())
     }
 
     private fun maybeRequestNotifications() {

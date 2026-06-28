@@ -50,6 +50,7 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
     val repo = vm.repository()
     val snap by vm.snapshot.collectAsState()
     val ytState by vm.ytdlpState.collectAsState()
+    val clipboardMonitor by vm.clipboardMonitor.collectAsState()
 
     var limitText by remember { mutableStateOf(if (snap.maxSpeed > 0) vm.formatRate(snap.maxSpeed).removeSuffix("/s") else "") }
     var autoExport by remember { mutableStateOf(repo.autoExport) }
@@ -105,6 +106,15 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
                     "When off, downloads wait until you start them.",
                     snap.globalAutostart,
                 ) { vm.setGlobalAutostart(it) }
+            }
+
+            SettingCard("Adding links") {
+                ToggleRow(
+                    "Watch clipboard for links",
+                    "Copy a link and it’s added to Review automatically. Works while " +
+                        "the app is open — Android blocks clipboard access in the background.",
+                    clipboardMonitor,
+                ) { vm.setClipboardMonitor(it) }
             }
 
             SettingCard("Where to save") {
