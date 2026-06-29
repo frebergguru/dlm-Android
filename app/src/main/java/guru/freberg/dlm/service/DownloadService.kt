@@ -103,6 +103,9 @@ class DownloadService : LifecycleService() {
     /** Copy finished files into the user's SAF tree when auto-export is on. */
     private fun observeForExport() {
         lifecycleScope.launch {
+            // repo.snapshot is a StateFlow, which already conflates: a busy collector
+            // (the blocking SAF copy below) only ever resumes on the latest snapshot,
+            // so bursts of ~5 Hz progress emissions never queue redundant export passes.
             repo.snapshot.collect { snap ->
                 if (!repo.autoExport || repo.downloadTreeUri() == null) return@collect
                 val pending = snap.downloads.filter { it.state == QState.DONE && it.id !in exported }
@@ -121,8 +124,11 @@ class DownloadService : LifecycleService() {
                         }
                     }
                 }
-                // Bound the set: drop ids no longer present in the queue.
-                exported.retainAll(snap.downloads.mapTo(HashSet()) { it.id })
+                // Bound the set: drop ids no longer present in the queue. Skip the
+                // allocation entirely when nothing has been exported yet.
+                if (exported.isNotEmpty()) {
+                    exported.retainAll(snap.downloads.mapTo(HashSet(snap.downloads.size)) { it.id })
+                }
             }
         }
     }

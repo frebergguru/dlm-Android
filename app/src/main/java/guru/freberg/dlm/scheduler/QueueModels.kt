@@ -98,10 +98,13 @@ data class QueueSnapshot(
     val maxSpeed: Long = 0,
     val globalAutostart: Boolean = true,
 ) {
-    val downloads: List<LinkSnap> get() = links.filter { it.list == ListKind.DOWNLOAD }
-    val linkgrabber: List<LinkSnap> get() = links.filter { it.list == ListKind.LINKGRABBER }
-    val activeCount: Int get() = links.count { it.state == QState.ACTIVE }
-    val totalSpeedBps: Double get() = links.filter { it.state == QState.ACTIVE }.sumOf { it.speedBps }
+    // Computed once at construction (the snapshot is immutable and rebuilt each tick),
+    // not on every access: the service and both screens read these repeatedly per
+    // emit. Not constructor params, so they stay out of equals()/hashCode().
+    val downloads: List<LinkSnap> = links.filter { it.list == ListKind.DOWNLOAD }
+    val linkgrabber: List<LinkSnap> = links.filter { it.list == ListKind.LINKGRABBER }
+    val activeCount: Int = links.count { it.state == QState.ACTIVE }
+    val totalSpeedBps: Double = links.asSequence().filter { it.state == QState.ACTIVE }.sumOf { it.speedBps }
 }
 
 /**

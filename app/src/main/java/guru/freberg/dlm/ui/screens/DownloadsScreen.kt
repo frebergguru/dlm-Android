@@ -57,7 +57,10 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
 
     val downloads = snap.downloads
     val pkgs = snap.packages.filter { it.list == ListKind.DOWNLOAD }
-    val ungrouped = downloads.filter { it.packageId == 0L }
+    // One pass to bucket links by package instead of re-filtering the full list per
+    // package (O(links) rather than O(packages × links)) in the LazyColumn builder.
+    val byPackage = downloads.groupBy { it.packageId }
+    val ungrouped = byPackage[0L].orEmpty()
     val hasFinished = downloads.any { it.state == QState.DONE }
 
     Scaffold(
@@ -112,7 +115,7 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
                     DownloadRow(vm, link, onMenu = { sheetLink = it })
                 }
                 pkgs.forEach { pkg ->
-                    val links = downloads.filter { it.packageId == pkg.id }
+                    val links = byPackage[pkg.id].orEmpty()
                     item(key = "pkg-${pkg.id}") {
                         PackageHeader(
                             pkg = pkg,

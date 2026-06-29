@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.baselineprofile)
 }
 
 kotlin {
@@ -20,8 +21,8 @@ android {
         applicationId = "guru.freberg.dlm"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -97,6 +98,10 @@ dependencies {
 
     implementation(libs.work.runtime.ktx)
     implementation(libs.documentfile)
+
+    // Installs the generated Baseline Profile at app install time (cold-start AOT).
+    implementation(libs.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
 
     // yt-dlp runtime (Python + yt-dlp + ffmpeg). The Python/yt-dlp payload is
     // initialised + auto-updated on first use; see YtdlpManager.

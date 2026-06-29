@@ -652,8 +652,12 @@ class QueueScheduler(
     private fun publishLocked() {
         val linkSnaps = items.sortedWith(compareBy<QItem> { it.position }.thenBy { it.id })
             .map { it.toSnap() }
+        // Single pass for per-package link counts instead of items.count{} per package
+        // (O(items + packages) rather than O(packages × items) on every publish).
+        val counts = HashMap<Long, Int>(pkgs.size)
+        for (it in items) if (it.packageId > 0) counts.merge(it.packageId, 1, Int::plus)
         val pkgSnaps = pkgs.sortedWith(compareBy<QPkg> { it.position }.thenBy { it.id })
-            .map { p -> p.toSnap(items.count { it.packageId == p.id }) }
+            .map { p -> p.toSnap(counts[p.id] ?: 0) }
         _snapshot.value = QueueSnapshot(linkSnaps, pkgSnaps, maxActive, maxSpeed, globalAutostart)
     }
 

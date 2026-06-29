@@ -84,10 +84,23 @@ target_compile_options(dlmcore PRIVATE $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURC
 target_link_options(dlmcore PRIVATE -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack)
 
 target_compile_definitions(dlmcore PRIVATE PCRE2_CODE_UNIT_WIDTH=8)
-# Keep the bundled SQLite lean; the queue store uses a small, standard subset.
+# Keep the bundled SQLite lean; the queue store uses a small, standard subset
+# (WAL, plain CREATE TABLE, prepared statements — no FTS/JSON/rtree/ATTACH/extensions),
+# so apply SQLite's recommended embedded compile-time options for size + speed.
+# These leave behaviour identical for the features store.c actually uses; do NOT add
+# SQLITE_OMIT_AUTOINIT (store.c calls sqlite3_open without a manual sqlite3_initialize).
 set_source_files_properties(sqlite/sqlite3.c PROPERTIES COMPILE_OPTIONS "-w")
 target_compile_definitions(dlmcore PRIVATE
-    SQLITE_OMIT_LOAD_EXTENSION SQLITE_DEFAULT_FOREIGN_KEYS=1 SQLITE_THREADSAFE=1)
+    SQLITE_OMIT_LOAD_EXTENSION SQLITE_DEFAULT_FOREIGN_KEYS=1 SQLITE_THREADSAFE=1
+    SQLITE_DEFAULT_MEMSTATUS=0
+    SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
+    SQLITE_LIKE_DOESNT_MATCH_BLOBS
+    SQLITE_MAX_EXPR_DEPTH=0
+    SQLITE_OMIT_DEPRECATED
+    SQLITE_OMIT_PROGRESS_CALLBACK
+    SQLITE_OMIT_SHARED_CACHE
+    SQLITE_DQS=0
+    SQLITE_TEMP_STORE=2)
 
 # curl(static) -> ssl -> crypto -> z; pcre2/jansson/sqlite compiled in.
 target_link_libraries(dlmcore

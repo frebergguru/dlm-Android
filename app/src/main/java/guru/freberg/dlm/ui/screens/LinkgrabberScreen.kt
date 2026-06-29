@@ -57,6 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import guru.freberg.dlm.scheduler.LinkSnap
 import guru.freberg.dlm.scheduler.ListKind
 import guru.freberg.dlm.scheduler.PkgSnap
@@ -81,8 +83,14 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
     val failedFavicons by vm.failedFavicons.collectAsState()
     val clipboardMonitor by vm.clipboardMonitor.collectAsState()
 
-    // Unique hosts in first-appearance order (mirrors render_site_view).
-    val hosts = remember(staged) { staged.map { hostOf(it.url) }.distinct() }
+    // Grouping is precomputed once and remembered keyed on the (structurally-equal
+    // across download ticks) review lists, so the O(N×M) host/package bucketing does
+    // not re-run on every ~5 Hz snapshot emission while a download is active.
+    // groupBy preserves first-appearance order, so byHost.keys mirrors render_site_view.
+    val byHost = remember(staged) { staged.groupBy { hostOf(it.url) } }
+    val byPackage = remember(staged) { staged.groupBy { it.packageId } }
+    val pkgsByHost = remember(pkgs, staged) { pkgs.groupBy { pkgHost(it, staged) } }
+    val hosts = byHost.keys
 
     var sheetLink by remember { mutableStateOf<LinkSnap?>(null) }
     var sheetPkg by remember { mutableStateOf<PkgSnap?>(null) }
@@ -140,7 +148,7 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
                         GroupMode.PKG -> {
                             items(ungrouped, key = { it.id }) { link -> ReviewRow(link, onMenu = { sheetLink = it }) }
                             pkgs.forEach { pkg ->
-                                val links = staged.filter { it.packageId == pkg.id }
+                                val links = byPackage[pkg.id].orEmpty()
                                 item(key = "pkg-${pkg.id}") {
                                     PackageHeader(
                                         pkg = pkg, expanded = !pkg.collapsed, activeInPkg = 0,
@@ -154,7 +162,7 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
 
                         GroupMode.SITE, GroupMode.SITE_PKG -> {
                             hosts.forEach { host ->
-                                val hostLinks = staged.filter { hostOf(it.url) == host }
+                                val hostLinks = byHost[host].orEmpty()
                                 val collapsed = host in collapsedSites
                                 item(key = "site-$host") {
                                     SiteHeader(
@@ -172,8 +180,8 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
                                     items(hostLinks, key = { it.id }) { link -> ReviewRow(link, onMenu = { sheetLink = it }) }
                                 } else {
                                     // packages of this host, then its loose links
-                                    pkgs.filter { pkgHost(it, staged) == host }.forEach { pkg ->
-                                        val links = staged.filter { it.packageId == pkg.id }
+                                    pkgsByHost[host].orEmpty().forEach { pkg ->
+                                        val links = byPackage[pkg.id].orEmpty()
                                         item(key = "pkg-${pkg.id}") {
                                             PackageHeader(
                                                 pkg = pkg, expanded = !pkg.collapsed, activeInPkg = 0,
@@ -271,12 +279,18 @@ private fun SiteHeader(
 @Composable
 private fun SiteFavicon(host: String, failed: Boolean, onFail: () -> Unit) {
     val url = faviconUrl(host)
+    val context = LocalPlatformContext.current
     Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
         // Globe shows through until (and unless) the favicon paints over it.
         Icon(Icons.Filled.Public, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         if (url != null && !failed) {
+            // Decode/cache at the 24dp render size (~48px @2x) instead of the source
+            // resolution, so favicons cost only a few KB of bitmap memory each.
+            val request = remember(url) {
+                ImageRequest.Builder(context).data(url).size(48).build()
+            }
             AsyncImage(
-                model = url,
+                model = request,
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
                 onState = { state -> if (state is AsyncImagePainter.State.Error) onFail() },

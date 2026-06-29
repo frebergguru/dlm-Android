@@ -5,6 +5,7 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import guru.freberg.dlm.repo.AppContainer
 import guru.freberg.dlm.ytdlp.YtdlpUpdateWorker
@@ -28,5 +29,8 @@ class DlmApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components { add(OkHttpNetworkFetcherFactory()) }
+            // Favicons are tiny; cap the in-memory cache well below Coil's 25%-of-heap
+            // default so the image loader never becomes a memory hog.
+            .memoryCache { MemoryCache.Builder().maxSizeBytes(8L * 1024 * 1024).build() }
             .build()
 }

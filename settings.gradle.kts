@@ -27,3 +27,4 @@ dependencyResolutionManagement {
 rootProject.name = "dlm-Android"
 include(":app")
 include(":core")
+include(":baselineprofile")
