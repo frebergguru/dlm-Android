@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -30,7 +30,9 @@ fun AddUrlDialog(
     onAddDirect: (String) -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
-    var url by remember { mutableStateOf(initialUrl) }
+    // Saveable so a partially typed/pasted link survives configuration changes
+    // (e.g. rotation) instead of being wiped back to the initial value.
+    var url by rememberSaveable { mutableStateOf(initialUrl) }
 
     // Auto-paste: on open, if the field is still empty and the clipboard holds a
     // link, prefill it (mirrors the desktop on_add_clip_ready). Reading here can

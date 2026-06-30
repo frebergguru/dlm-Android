@@ -23,21 +23,80 @@ typedef struct {
 
 extern dlm_jni_cache g_jni;
 
-/* Duplicate a Java string into a freshly malloc'd UTF-8 C string (NULL-safe).
- * Caller frees. Returns NULL when js is NULL. */
+/* Throw java.lang.RuntimeException(msg) if no exception is already pending.
+ * Used to turn a C-side NULL result into a proper Java exception so a Kotlin
+ * non-null return type never receives an unexpected null. */
+static inline void jni_throw_runtime(JNIEnv *env, const char *msg)
+{
+    if ((*env)->ExceptionCheck(env)) return;
+    jclass cls = (*env)->FindClass(env, "java/lang/RuntimeException");
+    if (cls) {
+        (*env)->ThrowNew(env, cls, msg);
+        (*env)->DeleteLocalRef(env, cls);
+    }
+}
+
+/* Duplicate a Java string into a freshly malloc'd, standard-UTF-8 C string
+ * (NULL-safe). Caller frees. Returns NULL when js is NULL or on allocation
+ * failure.
+ *
+ * We deliberately convert from the UTF-16 string contents rather than via
+ * GetStringUTFChars(): the latter returns Java "modified UTF-8" (CESU-8),
+ * where a supplementary code point comes back as a 6-byte surrogate pair and
+ * U+0000 as 0xC0 0x80. The C core (curl, sqlite, filename sanitizer, JSON)
+ * expects standard UTF-8, and jstr_new() on the way out rejects lone
+ * surrogates — so a CESU-8 round-trip would corrupt emoji/rare-CJK text. This
+ * decoder emits a real 4-byte sequence for supplementary scalars. */
 static inline char *jstr_dup(JNIEnv *env, jstring js)
 {
     if (!js) return NULL;
-    const char *c = (*env)->GetStringUTFChars(env, js, NULL);
-    if (!c) {
-        /* GetStringUTFChars failed and left a pending OutOfMemoryError; clear it
-         * so callers can safely keep making JNI calls (undefined otherwise). */
+    if ((*env)->ExceptionCheck(env)) return NULL;
+    jsize ulen = (*env)->GetStringLength(env, js); /* UTF-16 code units */
+    const jchar *u = (*env)->GetStringChars(env, js, NULL);
+    if (!u) {
         if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
         return NULL;
     }
-    char *out = strdup(c);
-    (*env)->ReleaseStringUTFChars(env, js, c);
-    return out;
+    /* Max 3 UTF-8 bytes per BMP unit; a surrogate pair (2 units) yields a
+     * 4-byte sequence, i.e. <= 3 bytes/unit. 3*ulen + 1 is a safe bound. */
+    unsigned char *out = (unsigned char *)malloc((size_t)ulen * 3 + 1);
+    if (!out) {
+        (*env)->ReleaseStringChars(env, js, u);
+        return NULL;
+    }
+    size_t o = 0;
+    for (jsize i = 0; i < ulen; i++) {
+        unsigned int cp = u[i];
+        if (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < ulen) {
+            unsigned int lo = u[i + 1];
+            if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                cp = 0x10000 + (((cp - 0xD800) << 10) | (lo - 0xDC00));
+                i++;
+            } else {
+                cp = 0xFFFD; /* unpaired high surrogate */
+            }
+        } else if (cp >= 0xD800 && cp <= 0xDFFF) {
+            cp = 0xFFFD; /* lone surrogate */
+        }
+        if (cp < 0x80) {
+            out[o++] = (unsigned char)cp;
+        } else if (cp < 0x800) {
+            out[o++] = (unsigned char)(0xC0 | (cp >> 6));
+            out[o++] = (unsigned char)(0x80 | (cp & 0x3F));
+        } else if (cp < 0x10000) {
+            out[o++] = (unsigned char)(0xE0 | (cp >> 12));
+            out[o++] = (unsigned char)(0x80 | ((cp >> 6) & 0x3F));
+            out[o++] = (unsigned char)(0x80 | (cp & 0x3F));
+        } else {
+            out[o++] = (unsigned char)(0xF0 | (cp >> 18));
+            out[o++] = (unsigned char)(0x80 | ((cp >> 12) & 0x3F));
+            out[o++] = (unsigned char)(0x80 | ((cp >> 6) & 0x3F));
+            out[o++] = (unsigned char)(0x80 | (cp & 0x3F));
+        }
+    }
+    out[o] = '\0';
+    (*env)->ReleaseStringChars(env, js, u);
+    return (char *)out;
 }
 
 /* New Java string from a C string (NULL -> Java null).
@@ -52,6 +111,10 @@ static inline char *jstr_dup(JNIEnv *env, jstring js)
 static inline jstring jstr_new(JNIEnv *env, const char *s)
 {
     if (!s) return NULL;
+    /* Never call NewStringUTF() with an exception already pending (undefined per
+     * spec). Callers issue several jstr_new() in a row before checking; if an
+     * earlier one threw OOM, bail so the batch unwinds to the caller's check. */
+    if ((*env)->ExceptionCheck(env)) return NULL;
 
     const unsigned char *in = (const unsigned char *)s;
     size_t len = strlen(s);

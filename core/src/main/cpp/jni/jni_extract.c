@@ -114,6 +114,9 @@ Java_guru_freberg_dlm_core_jni_NativeExtract_nExtract(JNIEnv *env, jobject thiz,
         out = result_to_jobject(env, NULL, needs);
     }
     free(u);
+    /* ExtractResult is non-null on the Kotlin side; turn an allocation failure
+     * into a thrown exception instead of a null that would NPE the caller. */
+    if (!out) jni_throw_runtime(env, "nExtract: failed to build result");
     return out;
 }
 
@@ -138,6 +141,8 @@ Java_guru_freberg_dlm_core_jni_NativeExtract_nParseYtdlp(JNIEnv *env, jobject th
     }
     free(j);
     free(u);
+    /* Non-null ExtractResult on the Kotlin side; throw on allocation failure. */
+    if (!out) jni_throw_runtime(env, "nParseYtdlp: failed to build result");
     return out;
 }
 

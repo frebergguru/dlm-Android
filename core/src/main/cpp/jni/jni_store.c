@@ -220,6 +220,10 @@ Java_guru_freberg_dlm_core_jni_NativeStore_nLoadAll(JNIEnv *env, jclass cls, jlo
      * a truncated view as authoritative. Fail the whole load instead. */
     if (ctx.failed || rc != 0) {
         row_ctx_release(env, &ctx);
+        /* Kotlin declares this non-null; surface a real exception (rather than a
+         * bare null that NPEs at the call site) when the failure wasn't already
+         * a pending Java exception (e.g. a C-side realloc/global-ref failure). */
+        jni_throw_runtime(env, "nLoadAll: failed to load queue rows");
         return NULL;
     }
 
@@ -359,6 +363,8 @@ Java_guru_freberg_dlm_core_jni_NativeStore_nLoadPackages(JNIEnv *env, jclass cls
      * full package list. */
     if (ctx.failed || rc != 0) {
         pkg_ctx_release(env, &ctx);
+        /* Non-null on the Kotlin side; throw rather than return a null array. */
+        jni_throw_runtime(env, "nLoadPackages: failed to load packages");
         return NULL;
     }
 

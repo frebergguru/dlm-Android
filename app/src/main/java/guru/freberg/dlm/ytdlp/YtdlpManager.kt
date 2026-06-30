@@ -47,6 +47,16 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
     // worker's checkForUpdate, and the background update) — updateYoutubeDL writes
     // runtime files and is not safe to run concurrently with itself.
     private val updateMutex = Mutex()
+    // Readers-writer gate over the yt-dlp runtime files. updateYoutubeDL() (the
+    // writer) rewrites those files and must not overlap an in-flight resolve or
+    // download execute() (a reader), or the running yt-dlp could read a
+    // half-rewritten runtime. A plain mutex would serialise all downloads, so we
+    // count concurrent readers instead: while an update is pending, no new reader
+    // starts, and the update waits for the active readers to drain. All access to
+    // the two fields below is confined to rwGate.
+    private val rwGate = Mutex()
+    private var updateInProgress = false
+    private var activeRuntimeUsers = 0
     // Background scope for the (network) version check so it never sits on the
     // user-facing resolve/download path.
     private val bgScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -125,18 +135,46 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
     }
 
     private suspend fun runUpdate(): Boolean = updateMutex.withLock {
-        withContext(Dispatchers.IO) {
-            StatusCenter.begin(ST_UPDATE, "Updating yt-dlp", "Checking for a newer version…")
-            runCatching {
-                YoutubeDL.getInstance().updateYoutubeDL(appContext)
-                prefs.edit().putLong(KEY_LAST_UPDATE, System.currentTimeMillis()).apply()
-                true
-            }.onSuccess {
-                StatusCenter.finish(ST_UPDATE, true, "yt-dlp is up to date")
-            }.onFailure {
-                StatusCenter.finish(ST_UPDATE, false, friendly(it.message) ?: "Couldn’t check for updates")
-                Log.w(TAG, "yt-dlp update skipped: ${it.message}")
-            }.getOrDefault(false)
+        // Take the writer side of the gate: block new runtime users, then wait for
+        // any in-flight resolve/download to finish before rewriting yt-dlp's files.
+        rwGate.withLock { updateInProgress = true }
+        try {
+            while (true) {
+                if (rwGate.withLock { activeRuntimeUsers == 0 }) break
+                delay(100)
+            }
+            withContext(Dispatchers.IO) {
+                StatusCenter.begin(ST_UPDATE, "Updating yt-dlp", "Checking for a newer version…")
+                runCatching {
+                    YoutubeDL.getInstance().updateYoutubeDL(appContext)
+                    prefs.edit().putLong(KEY_LAST_UPDATE, System.currentTimeMillis()).apply()
+                    true
+                }.onSuccess {
+                    StatusCenter.finish(ST_UPDATE, true, "yt-dlp is up to date")
+                }.onFailure {
+                    StatusCenter.finish(ST_UPDATE, false, friendly(it.message) ?: "Couldn’t check for updates")
+                    Log.w(TAG, "yt-dlp update skipped: ${it.message}")
+                }.getOrDefault(false)
+            }
+        } finally {
+            rwGate.withLock { updateInProgress = false }
+        }
+    }
+
+    /** Run [block] as a yt-dlp runtime "reader": waits out any in-progress update,
+     * then holds a reader slot for the duration so an update can't start mid-run. */
+    private suspend fun <T> withRuntimeUse(block: suspend () -> T): T {
+        while (true) {
+            val acquired = rwGate.withLock {
+                if (updateInProgress) false else { activeRuntimeUsers++; true }
+            }
+            if (acquired) break
+            delay(100)
+        }
+        try {
+            return block()
+        } finally {
+            rwGate.withLock { activeRuntimeUsers-- }
         }
     }
 
@@ -162,7 +200,7 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
                     // flag (e.g. --exec). buildCommand emits commands just before urls.
                     addCommands(listOf("--"))
                 }
-                val json = YoutubeDL.getInstance().execute(req).out
+                val json = withRuntimeUse { YoutubeDL.getInstance().execute(req).out }
                 if (json.isBlank()) null
                 else NativeExtract.parseYtdlp(json, url)
             } catch (e: Exception) {
@@ -208,10 +246,12 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
                 }
             }
             try {
-                YoutubeDL.getInstance().execute(req, processId) { progress, _, _ ->
-                    // progress is a 0..100 percentage; bytes aren't exposed, so
-                    // report a normalised total for the progress bar.
-                    if (progress >= 0f) sink(progress.toLong(), 100L, -1.0)
+                withRuntimeUse {
+                    YoutubeDL.getInstance().execute(req, processId) { progress, _, _ ->
+                        // progress is a 0..100 percentage; bytes aren't exposed, so
+                        // report a normalised total for the progress bar.
+                        if (progress >= 0f) sink(progress.toLong(), 100L, -1.0)
+                    }
                 }
                 if (isCancelled()) DLM_ERR_CANCELLED else DLM_OK
             } catch (e: Exception) {

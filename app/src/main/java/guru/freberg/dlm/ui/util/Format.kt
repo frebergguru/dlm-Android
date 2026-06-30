@@ -20,7 +20,10 @@ fun formatBytes(n: Long): String {
     if (n < 0) return "—"
     val units = arrayOf("B", "KiB", "MiB", "GiB", "TiB")
     var v = n.toDouble(); var u = 0
-    while (v >= 1024 && u < units.size - 1) { v /= 1024; u++ }
+    // Roll over at 1023.95, not 1024: a value like 1048575 divides to 1023.999,
+    // which "%.1f" would otherwise render as the nonsensical "1024.0 KiB" instead
+    // of "1.0 MiB".
+    while (v >= 1023.95 && u < units.size - 1) { v /= 1024; u++ }
     return if (u == 0) "$n B" else String.format(Locale.US, "%.1f %s", v, units[u])
 }
 

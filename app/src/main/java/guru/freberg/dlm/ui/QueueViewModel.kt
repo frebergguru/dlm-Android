@@ -81,7 +81,16 @@ class QueueViewModel(app: Application) : AndroidViewModel(app) {
     /** Confirm every linkgrabber link whose host matches [host] into the queue,
      * started. Mirrors the desktop "confirm all from this site". */
     fun confirmSite(host: String) = viewModelScope.launch {
-        val links = snapshot.value.linkgrabber.filter { hostOf(it.url) == host }
+        val snap = snapshot.value
+        // Match the linkgrabber's site grouping exactly: a link's site is its
+        // package's source-URL host when packaged (extractor task URLs like
+        // "nrk:ID" have no real host), else the link's own host. Filtering by
+        // hostOf(url) alone confirmed nothing for video/extractor sites whose
+        // task URLs differ from the page host shown in the header.
+        val pkgComment = snap.packages.associate { it.id to it.comment }
+        fun hostForLink(l: guru.freberg.dlm.scheduler.LinkSnap): String =
+            hostOf((if (l.packageId > 0) pkgComment[l.packageId] else null)?.takeIf { it.isNotBlank() } ?: l.url)
+        val links = snap.linkgrabber.filter { hostForLink(it) == host }
         for (link in links) repo.confirm(link.id, false, true)
         notify(
             if (links.isEmpty()) "Nothing to confirm"

@@ -466,7 +466,8 @@ class QueueScheduler(
      * ones). Items stopped here are tagged [QItem.globallyPaused] so resuming
      * re-queues exactly them, leaving manually-paused links paused.
      */
-    suspend fun setGlobalAutostart(on: Boolean) = mutex.withLock {
+    suspend fun setGlobalAutostart(on: Boolean) = withContext(storeDispatcher) {
+      mutex.withLock {
         globalAutostart = on
         if (on) {
             // Resume: re-queue everything we globally paused. Items still winding
@@ -487,6 +488,7 @@ class QueueScheduler(
             }
         }
         publishLocked()
+      }
     }
 
     /** Remove every finished link plus any package thereby left empty. */
@@ -510,11 +512,21 @@ class QueueScheduler(
         mutex.withLock {
             var active = items.count { it.job != null }
 
-            // forced links start unconditionally (ignore max_active / autostart)
-            for (it in items) {
-                if (it.force && it.list == ListKind.DOWNLOAD && it.state == QState.QUEUED &&
-                    it.job == null && it.enabled
-                ) if (startItem(it)) active++
+            // "Start now": forced links jump to the front of the queue but still
+            // respect max_active (they never run *on top of* the cap). They start
+            // even when global autostart is off — the user explicitly expedited
+            // them — and are ordered among themselves by priority then position.
+            // A forced link that can't get a slot now stays queued and grabs the
+            // next one to free up.
+            while (active < maxActive) {
+                val best = items
+                    .filter {
+                        it.force && it.list == ListKind.DOWNLOAD && it.state == QState.QUEUED &&
+                            it.job == null && it.enabled
+                    }
+                    .minWithOrNull(compareByDescending<QItem> { it.priority }.thenBy { it.position })
+                    ?: break
+                if (startItem(best)) active++ else break
             }
 
             // start eligible by priority desc, then position asc, up to max_active

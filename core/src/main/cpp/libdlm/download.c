@@ -270,15 +270,29 @@ static size_t seg_write_cb(char *ptr, size_t size, size_t nmemb, void *userp)
         }
     }
 
+    /* Never write past this segment's end. A server that honours the start of
+     * a Range but over-sends (e.g. replies 206 but streams past the requested
+     * end) would otherwise clobber the next segment's bytes and over-count
+     * dl->downloaded. Clamp the write to the remaining span; tell curl we
+     * consumed the whole buffer so the transfer ends cleanly at the boundary
+     * rather than erroring, and drop the overflow. */
+    size_t want = len;
+    if (s->end >= 0) {
+        int64_t span = s->end - s->start + 1;
+        int64_t room = span - s->done;
+        if (room <= 0) return len;          /* segment already full; discard extra */
+        if ((int64_t)want > room) want = (size_t)room;
+    }
+
     off_t off = (off_t)(s->start + s->done);
-    ssize_t w = pwrite(dl->fd, ptr, len, off);
-    if (w < 0 || (size_t)w != len) {
+    ssize_t w = pwrite(dl->fd, ptr, want, off);
+    if (w < 0 || (size_t)w != want) {
         DLM_ERROR("pwrite failed at %lld: %s", (long long)off, strerror(errno));
         dl->io_error = 1;
         return 0;
     }
-    s->done += len;
-    dl->downloaded += len;
+    s->done += want;
+    dl->downloaded += want;
     return len;
 }
 
@@ -396,6 +410,16 @@ static int journal_load(dlm_download_t *dl)
             tmp[i].end = end;
             tmp[i].done = done;
             total_done += done;
+        }
+        /* Per-segment bounds aren't enough: the segments must also tile the
+         * whole file exactly — contiguous, in order, no gaps or overlaps —
+         * else a journal of e.g. all-zero-length segments would pass the
+         * checks above yet mark a mostly zero-filled part file complete. */
+        if (valid) {
+            if (tmp[0].start != 0 || tmp[nseg - 1].end != dl->total - 1)
+                valid = 0;
+            for (int i = 1; i < nseg && valid; i++)
+                if (tmp[i].start != tmp[i - 1].end + 1) valid = 0;
         }
         if (valid) {
             dl->nsegments = nseg;
@@ -518,14 +542,17 @@ static dlm_result run_multi(dlm_download_t *dl)
         CURLMsg *m;
         while ((m = curl_multi_info_read(multi, &msgs))) {
             if (m->msg != CURLMSG_DONE) continue;
-            dlm_segment_t *s = NULL;
-            curl_easy_getinfo(m->easy_handle, CURLINFO_PRIVATE, (char **)&s);
+            /* The CURLMsg (and the memory *m points at) does not survive
+             * curl_multi_remove_handle, so snapshot everything we need first. */
+            CURL *eh = m->easy_handle;
             CURLcode res = m->data.result;
+            dlm_segment_t *s = NULL;
+            curl_easy_getinfo(eh, CURLINFO_PRIVATE, (char **)&s);
             long code = 0;
-            curl_easy_getinfo(m->easy_handle, CURLINFO_RESPONSE_CODE, &code);
+            curl_easy_getinfo(eh, CURLINFO_RESPONSE_CODE, &code);
 
-            curl_multi_remove_handle(multi, m->easy_handle);
-            curl_easy_cleanup(m->easy_handle);
+            curl_multi_remove_handle(multi, eh);
+            curl_easy_cleanup(eh);
             s->easy = NULL;
             active--;
 
@@ -732,6 +759,11 @@ void dlm_global_cleanup(void)
     if (g_inited) {
         curl_global_cleanup();
         g_inited = 0;
+        /* Make the init/cleanup pair reusable: reset the once-control and the
+         * captured result so a later dlm_global_init() re-runs curl_global_init()
+         * instead of returning a stale success without re-initialising libcurl. */
+        g_init_once = (pthread_once_t)PTHREAD_ONCE_INIT;
+        g_init_rc = 0;
     }
 }
 

@@ -26,6 +26,10 @@ object SafMover {
      */
     suspend fun export(context: Context, treeUri: Uri, file: File, subDir: String? = null): Boolean =
         withContext(Dispatchers.IO) {
+            // The destination document we create below. On any failure after
+            // creation we delete it so a failed export never litters the user's
+            // tree with an empty or partial file; cleared on success.
+            var createdDoc: DocumentFile? = null
             try {
                 if (!file.exists()) return@withContext false
                 var tree = DocumentFile.fromTreeUri(context, treeUri) ?: return@withContext false
@@ -43,21 +47,28 @@ object SafMover {
                 tree.findFile(file.name)?.delete()
                 val mime = mimeOf(file.name)
                 val doc = tree.createFile(mime, file.name) ?: return@withContext false
+                createdDoc = doc
 
-                context.contentResolver.openOutputStream(doc.uri)?.use { out ->
-                    file.inputStream().use { it.copyTo(out) }
-                } ?: return@withContext false
+                val out = context.contentResolver.openOutputStream(doc.uri)
+                if (out == null) {
+                    doc.delete()
+                    return@withContext false
+                }
+                out.use { file.inputStream().use { input -> input.copyTo(it) } }
 
                 // Verify the whole file landed before the caller deletes the original.
                 val expected = file.length()
                 val written = doc.length()
                 if (written != expected) {
                     Log.e("SafMover", "size mismatch for ${file.name}: wrote $written of $expected")
+                    doc.delete()
                     return@withContext false
                 }
+                createdDoc = null // success — keep the destination
                 true
             } catch (e: Exception) {
                 Log.e("SafMover", "export failed for ${file.name}", e)
+                runCatching { createdDoc?.delete() }
                 false
             }
         }

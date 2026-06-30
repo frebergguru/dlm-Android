@@ -154,8 +154,10 @@ private fun AppRoot(
     onSharedConsumed: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.DOWNLOADS) }
-    var prefillUrl by remember { mutableStateOf(sharedUrl) }
-    var showAdd by remember { mutableStateOf(sharedUrl != null) }
+    // Saveable so an open Add dialog (and its prefill) isn't dismissed/lost on a
+    // configuration change such as rotation.
+    var prefillUrl by rememberSaveable { mutableStateOf(sharedUrl) }
+    var showAdd by rememberSaveable { mutableStateOf(sharedUrl != null) }
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()

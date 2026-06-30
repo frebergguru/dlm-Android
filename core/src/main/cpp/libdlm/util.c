@@ -88,8 +88,14 @@ const char *dlm_ca_bundle(void) { return g_ca_bundle; }
 
 void dlm_set_ca_bundle(const char *path)
 {
-    free(g_ca_bundle);
-    g_ca_bundle = (path && *path) ? dlm_xstrdup(path) : NULL;
+    char *next = (path && *path) ? dlm_xstrdup(path) : NULL;
+    /* Publish the new pointer without freeing the old one: a download worker
+     * thread may still be reading the previous value through dlm_ca_bundle().
+     * This is set once at init in practice, so the at-most-one-time leak on a
+     * re-set is preferable to a use-after-free on the download hot path.
+     * A pointer-sized aligned store is atomic on the target ABIs, so readers
+     * observe either the old or the new bundle, never a torn pointer. */
+    g_ca_bundle = next;
 }
 
 /* ---- time ------------------------------------------------------------- */

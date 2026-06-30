@@ -7,6 +7,7 @@ import guru.freberg.dlm.scheduler.QueueScheduler
 import guru.freberg.dlm.ytdlp.YtdlpManager
 import guru.freberg.dlm.core.jni.NativeLib
 import guru.freberg.dlm.core.jni.NativeStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -74,6 +75,9 @@ class AppContainer private constructor(private val appContext: Context) {
             runCatching { scheduler.load() }
                 .onSuccess { StatusCenter.finish("queue-load", true, "Queue loaded") }
                 .onFailure { e ->
+                    // Don't treat coroutine cancellation as a load failure: let it
+                    // propagate so structured concurrency unwinds correctly.
+                    if (e is CancellationException) throw e
                     loaded.set(false)
                     StatusCenter.finish("queue-load", false, "Queue load failed: ${e.message}")
                 }
