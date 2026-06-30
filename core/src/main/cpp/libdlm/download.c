@@ -169,6 +169,17 @@ static void apply_common_opts(CURL *c, dlm_download_t *dl)
         curl_easy_setopt(c, CURLOPT_HTTPHEADER, dl->header_list);
 }
 
+/* Map a non-success HTTP status to the most specific error, so the UI can tell
+ * "doesn't exist" (404) apart from "needs sign-in" (403) and an actual
+ * connection failure. Used only when curl itself succeeded (a real response came
+ * back); a transport failure stays DLM_ERR_NET. */
+static dlm_result http_status_error(long code)
+{
+    if (code == 404 || code == 410) return DLM_ERR_NOTFOUND;
+    if (code == 401 || code == 403) return DLM_ERR_FORBIDDEN;
+    return DLM_ERR_HTTP;
+}
+
 /* Probe size + range support. Sets dl->total and dl->resumable. */
 static dlm_result probe(dlm_download_t *dl)
 {
@@ -206,7 +217,10 @@ static dlm_result probe(dlm_download_t *dl)
         curl_easy_cleanup(c);
         if (rc != CURLE_OK || code >= 400) {
             DLM_ERROR("probe failed: %s (HTTP %ld)", curl_easy_strerror(rc), code);
-            return DLM_ERR_NET;
+            /* A real HTTP error status (server reachable) is not a connection
+             * failure — categorise it so the user sees "doesn't exist" etc. */
+            return (rc == CURLE_OK && code >= 400) ? http_status_error(code)
+                                                   : DLM_ERR_NET;
         }
         if (code == 206) {
             dl->resumable = 1;
@@ -572,7 +586,8 @@ static dlm_result run_multi(dlm_download_t *dl)
                     DLM_ERROR("segment %d failed permanently: %s (HTTP %ld)",
                               s->index, curl_easy_strerror(res), code);
                     s->failed = 1;
-                    result = DLM_ERR_NET;
+                    result = (res == CURLE_OK && code >= 400)
+                                 ? http_status_error(code) : DLM_ERR_NET;
                     goto cleanup;
                 }
                 DLM_WARN("segment %d retry %ld/%ld: %s (HTTP %ld)", s->index,
@@ -777,6 +792,8 @@ const char *dlm_strerror(dlm_result r)
     case DLM_ERR_HTTP: return "http error";
     case DLM_ERR_NOMEM: return "out of memory";
     case DLM_ERR_CANCELLED: return "cancelled";
+    case DLM_ERR_NOTFOUND: return "not found";
+    case DLM_ERR_FORBIDDEN: return "access denied";
     }
     return "unknown error";
 }

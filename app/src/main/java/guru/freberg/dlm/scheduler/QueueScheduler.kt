@@ -729,6 +729,8 @@ class QueueScheduler(
             -4 -> "HTTP error"
             -5 -> "out of memory"
             -6 -> "cancelled"
+            -7 -> "not found"
+            -8 -> "access denied"
             -99 -> "unexpected error"
             else -> "error ($rc)"
         }

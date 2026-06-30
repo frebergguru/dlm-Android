@@ -21,9 +21,11 @@ typedef enum {
     DLM_ERR_ARG = -1,      /* bad argument */
     DLM_ERR_NET = -2,      /* network / curl failure that survived retries */
     DLM_ERR_IO = -3,       /* local filesystem error */
-    DLM_ERR_HTTP = -4,     /* non-success HTTP status */
-    DLM_ERR_NOMEM = -5,    /* allocation failure */
-    DLM_ERR_CANCELLED = -6 /* cancelled via the cancel flag */
+    DLM_ERR_HTTP = -4,      /* other non-success HTTP status (e.g. 5xx) */
+    DLM_ERR_NOMEM = -5,     /* allocation failure */
+    DLM_ERR_CANCELLED = -6, /* cancelled via the cancel flag */
+    DLM_ERR_NOTFOUND = -7,  /* HTTP 404/410 — the file/URL does not exist */
+    DLM_ERR_FORBIDDEN = -8  /* HTTP 401/403 — access denied / needs sign-in */
 } dlm_result;
 
 /* Progress callback. Invoked periodically on the thread that drives the

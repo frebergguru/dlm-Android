@@ -209,7 +209,9 @@ private fun statusLine(vm: QueueViewModel, l: LinkSnap): String {
 private fun friendlyError(err: String?): String = when (err) {
     null -> "Failed"
     "network error" -> "Couldn’t connect — tap to try again"
-    "HTTP error" -> "The server refused the download"
+    "not found" -> "This link doesn’t exist (404)"
+    "access denied" -> "Access denied — it may need a sign-in (403)"
+    "HTTP error" -> "The server couldn’t serve this file"
     "filesystem error" -> "Couldn’t save the file"
     "out of memory" -> "Ran out of memory"
     "bad argument" -> "This link can’t be downloaded"
