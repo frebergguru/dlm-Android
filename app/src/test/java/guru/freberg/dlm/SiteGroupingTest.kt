@@ -23,7 +23,6 @@ class SiteGroupingTest {
         assertEquals("http://a.com", detectUrl("http://a.com"))
         assertEquals("ftp://a.com/f", detectUrl("ftp://a.com/f"))
         assertEquals("ftps://a.com/f", detectUrl("ftps://a.com/f"))
-        assertEquals("magnet:?xt=urn:btih:HASH", detectUrl("magnet:?xt=urn:btih:HASH"))
     }
 
     @Test fun detectUrl_trimsLeadingWhitespaceAndTakesFirstToken() {
@@ -41,6 +40,8 @@ class SiteGroupingTest {
         assertNull(detectUrl("just some text"))
         assertNull(detectUrl("file:///etc/passwd"))
         assertNull(detectUrl("ssh://host"))
+        // magnet/BitTorrent is unsupported by the yt-dlp/curl engine
+        assertNull(detectUrl("magnet:?xt=urn:btih:HASH"))
     }
 
     @Test fun hostOf_stripsSchemePortPathAndWww() {
@@ -60,10 +61,11 @@ class SiteGroupingTest {
         assertEquals("example.com", hostOf("HTTPS://Example.COM/Path"))
     }
 
-    @Test fun hostOf_magnetYieldsMagnet() {
-        assertEquals("magnet", hostOf("magnet:?xt=urn:btih:HASH&dn=name"))
-        // an '@' inside the magnet's query must not be treated as userinfo
-        assertEquals("magnet", hostOf("magnet:?xt=urn:btih:HASH&dn=John@Doe"))
+    @Test fun hostOf_schemelessInputUsesHost() {
+        // No "://": the whole string is the authority up to the first '/ ? #'.
+        assertEquals("example.com", hostOf("example.com/path"))
+        // an '@' inside a schemeless query must not be treated as userinfo
+        assertEquals("example.com", hostOf("example.com?dn=John@Doe"))
     }
 
     @Test fun hostOf_ignoresAtInQueryOrFragment() {
@@ -86,7 +88,6 @@ class SiteGroupingTest {
         assertEquals("YouTube", siteLabel("r1---sn-x.googlevideo.com"))
         assertEquals("Vimeo", siteLabel("vimeo.com"))
         assertEquals("SoundCloud", siteLabel("soundcloud.com"))
-        assertEquals("Magnet links", siteLabel("magnet"))
         assertEquals("Other links", siteLabel(""))
         assertEquals("example.com", siteLabel("example.com"))
     }
@@ -95,7 +96,6 @@ class SiteGroupingTest {
         assertTrue(isSafeDownloadInput("https://a.com/x"))
         assertTrue(isSafeDownloadInput("http://a.com"))
         assertTrue(isSafeDownloadInput("ftp://a.com/f"))
-        assertTrue(isSafeDownloadInput("magnet:?xt=urn:btih:HASH"))
         // schemeless host-like input stays allowed (yt-dlp/curl resolve it)
         assertTrue(isSafeDownloadInput("youtube.com/watch?v=x"))
         assertTrue(isSafeDownloadInput("  https://a.com/x  "))
@@ -112,6 +112,9 @@ class SiteGroupingTest {
         assertFalse(isSafeDownloadInput("intent://x#Intent;end"))
         assertFalse(isSafeDownloadInput("javascript:alert(1)"))
         assertFalse(isSafeDownloadInput("data:text/html,x"))
+        // magnet/BitTorrent: not supported by the yt-dlp/curl engine
+        assertFalse(isSafeDownloadInput("magnet:?xt=urn:btih:HASH"))
+        assertFalse(isSafeDownloadInput("MAGNET:?xt=urn:btih:HASH"))
         // empties
         assertFalse(isSafeDownloadInput(null))
         assertFalse(isSafeDownloadInput("   "))
@@ -120,6 +123,5 @@ class SiteGroupingTest {
     @Test fun faviconUrl_realHostsOnly() {
         assertEquals("https://example.com/favicon.ico", faviconUrl("example.com"))
         assertNull(faviconUrl(""))
-        assertNull(faviconUrl("magnet"))
     }
 }

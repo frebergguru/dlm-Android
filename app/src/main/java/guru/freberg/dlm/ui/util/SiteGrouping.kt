@@ -7,7 +7,7 @@ package guru.freberg.dlm.ui.util
  * dependencies so they can be unit-tested for parity with the C originals.
  */
 
-private val URL_SCHEMES = listOf("http://", "https://", "ftp://", "ftps://", "magnet:")
+private val URL_SCHEMES = listOf("http://", "https://", "ftp://", "ftps://")
 private val WS = charArrayOf(' ', '\t', '\n', '\r')
 
 /**
@@ -26,18 +26,22 @@ fun detectUrl(text: String?): String? {
 }
 
 // Schemes we refuse to hand to the resolver / native curl engine: local-file,
-// IPC and script vectors. http(s)/ftp(s)/magnet and schemeless host-like input
-// (which yt-dlp/curl resolve to https) are fine.
+// IPC and script vectors, plus `magnet:` — neither yt-dlp nor libcurl speaks
+// BitTorrent, so a magnet would only fail at download time with a generic
+// network error; reject it up front instead. http(s)/ftp(s) and schemeless
+// host-like input (which yt-dlp/curl resolve to https) are fine.
 private val BLOCKED_SCHEMES = listOf(
     "file:", "content:", "intent:", "javascript:", "data:", "blob:", "about:", "jar:",
+    "magnet:",
 )
 
 /**
- * Reject obviously-unsafe download input before it reaches yt-dlp / libcurl:
- * option-injection (a leading '-', which yt-dlp would parse as a CLI flag such as
- * `--exec`) and non-network schemes. Lenient on schemeless input so yt-dlp's
- * host-only URLs keep working. Defense-in-depth alongside the `--` argument
- * separator and curl's CURLOPT_PROTOCOLS restriction.
+ * Reject obviously-unsafe or unsupported download input before it reaches yt-dlp /
+ * libcurl: option-injection (a leading '-', which yt-dlp would parse as a CLI flag
+ * such as `--exec`) and non-network schemes (incl. `magnet:`, which the engine
+ * can't download). Lenient on schemeless input so yt-dlp's host-only URLs keep
+ * working. Defense-in-depth alongside the `--` argument separator and curl's
+ * CURLOPT_PROTOCOLS restriction.
  */
 fun isSafeDownloadInput(text: String?): Boolean {
     val t = text?.trim() ?: return false
@@ -49,16 +53,15 @@ fun isSafeDownloadInput(text: String?): Boolean {
 /**
  * Bare host of [url] for site grouping. Mirrors `host_of()`: strips the scheme
  * (`://`), userinfo (`user@`), then takes up to the first `/ : ? #`, lowercased,
- * dropping a leading `www.`. Schemeless URLs like `magnet:?…` yield `"magnet"`
- * (the scan stops at the first `:`), which [siteLabel] buckets as magnet links.
+ * dropping a leading `www.`.
  */
 fun hostOf(url: String?): String {
     if (url.isNullOrEmpty()) return ""
     val schemeIdx = url.indexOf("://")
     val rest = if (schemeIdx >= 0) url.substring(schemeIdx + 3) else url
     // The authority ends at the first '/', '?' or '#'. A '@' is userinfo only
-    // when it falls inside that authority; a '@' in a query/fragment (or in a
-    // schemeless magnet's query) must not be mistaken for a userinfo delimiter.
+    // when it falls inside that authority; a '@' in a query/fragment must not be
+    // mistaken for a userinfo delimiter.
     val authEnd = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
         .let { if (it < 0) rest.length else it }
     val at = rest.indexOf('@')
@@ -84,10 +87,9 @@ fun siteLabel(host: String): String = when {
         host.contains("ytimg") || host.contains("googlevideo") -> "YouTube"
     host.contains("vimeo") -> "Vimeo"
     host.contains("soundcloud") -> "SoundCloud"
-    host == "magnet" -> "Magnet links"
     else -> host
 }
 
-/** The favicon URL for a real [host], or null for blank/magnet (no real site). */
+/** The favicon URL for a real [host], or null for a blank host (no real site). */
 fun faviconUrl(host: String): String? =
-    if (host.isEmpty() || host == "magnet") null else "https://$host/favicon.ico"
+    if (host.isEmpty()) null else "https://$host/favicon.ico"
