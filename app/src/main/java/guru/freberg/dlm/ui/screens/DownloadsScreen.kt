@@ -58,10 +58,15 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
 
     val downloads = snap.downloads
     val pkgs = snap.packages.filter { it.list == ListKind.DOWNLOAD }
+    val pkgIds = pkgs.mapTo(HashSet()) { it.id }
     // One pass to bucket links by package instead of re-filtering the full list per
     // package (O(links) rather than O(packages × links)) in the LazyColumn builder.
     val byPackage = downloads.groupBy { it.packageId }
-    val ungrouped = byPackage[0L].orEmpty()
+    // Loose rows: ungrouped links, plus any link whose owning package isn't a
+    // download package yet — e.g. one link confirmed individually while the rest of
+    // its package is still under review. Without this they'd render under no header
+    // at all and vanish from the UI; they regroup once the package is confirmed.
+    val ungrouped = downloads.filter { it.packageId == 0L || it.packageId !in pkgIds }
     val hasFinished = downloads.any { it.state == QState.DONE }
 
     Scaffold(

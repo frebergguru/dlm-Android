@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -135,14 +136,21 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
     }
 
     private suspend fun runUpdate(): Boolean = updateMutex.withLock {
-        // Take the writer side of the gate: block new runtime users, then wait for
-        // any in-flight resolve/download to finish before rewriting yt-dlp's files.
-        rwGate.withLock { updateInProgress = true }
+        // Claim the writer side of the gate, but only if the runtime is idle right
+        // now. Rewriting yt-dlp's files under an in-flight resolve/download could
+        // corrupt that run; conversely, *waiting* for a possibly hours-long
+        // download to finish would stall every new resolve/download. So if anything
+        // is using the runtime, skip this round — updateDue() stays true (the
+        // timestamp is only written on success), so the next idle moment, the next
+        // hot-path attempt, or the weekly worker retries.
+        val claimed = rwGate.withLock {
+            if (activeRuntimeUsers > 0) false else { updateInProgress = true; true }
+        }
+        if (!claimed) {
+            Log.i(TAG, "yt-dlp update deferred: runtime in use")
+            return@withLock false
+        }
         try {
-            while (true) {
-                if (rwGate.withLock { activeRuntimeUsers == 0 }) break
-                delay(100)
-            }
             withContext(Dispatchers.IO) {
                 StatusCenter.begin(ST_UPDATE, "Updating yt-dlp", "Checking for a newer version…")
                 runCatching {
@@ -157,24 +165,29 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
                 }.getOrDefault(false)
             }
         } finally {
-            rwGate.withLock { updateInProgress = false }
+            // Must clear the flag even if the coroutine is being cancelled, or every
+            // future withRuntimeUse() would spin forever.
+            withContext(NonCancellable) { rwGate.withLock { updateInProgress = false } }
         }
     }
 
-    /** Run [block] as a yt-dlp runtime "reader": waits out any in-progress update,
-     * then holds a reader slot for the duration so an update can't start mid-run. */
+    /** Run [block] as a yt-dlp runtime "reader": waits out the brief window of an
+     * in-progress update, then holds a reader slot for the duration so an update
+     * can't start mid-run. Readers run concurrently with each other. */
     private suspend fun <T> withRuntimeUse(block: suspend () -> T): T {
         while (true) {
             val acquired = rwGate.withLock {
                 if (updateInProgress) false else { activeRuntimeUsers++; true }
             }
             if (acquired) break
-            delay(100)
+            delay(50)
         }
         try {
             return block()
         } finally {
-            rwGate.withLock { activeRuntimeUsers-- }
+            // Release the slot even under cancellation, or a later update would
+            // never see the runtime go idle.
+            withContext(NonCancellable) { rwGate.withLock { activeRuntimeUsers-- } }
         }
     }
 
