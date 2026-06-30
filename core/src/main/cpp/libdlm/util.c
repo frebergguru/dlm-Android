@@ -7,6 +7,10 @@
 #include <ctype.h>
 #include <stdarg.h>
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
 /* ---- logging ---------------------------------------------------------- */
 
 dlm_log_level dlm_log_threshold(void)
@@ -40,6 +44,18 @@ void dlm_logf(dlm_log_level lvl, const char *fmt, ...)
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fputc('\n', stderr);
+
+#if defined(__ANDROID__)
+    /* Android discards a library's stderr, so mirror to logcat (tag "libdlm").
+     * Without this the native engine's errors are invisible on-device. */
+    static const int aprio[] = {
+        ANDROID_LOG_ERROR, ANDROID_LOG_WARN, ANDROID_LOG_INFO, ANDROID_LOG_DEBUG,
+    };
+    va_list aap;
+    va_start(aap, fmt);
+    __android_log_vprint(aprio[lvl], "libdlm", fmt, aap);
+    va_end(aap);
+#endif
 }
 
 /* ---- allocation ------------------------------------------------------- */
