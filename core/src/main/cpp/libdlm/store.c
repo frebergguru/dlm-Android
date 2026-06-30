@@ -266,8 +266,9 @@ int dlm_store_load_all(dlm_store *s, dlm_store_row_cb cb, void *userdata)
         "error,created_at,package_id,priority,enabled,list,name,availability,"
         "position,force,autostart FROM downloads ORDER BY position,id;";
     if (sqlite3_prepare_v2(s->db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
-    int rc;
+    int rc, n = 0;
     while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
+        n++;
         dlm_store_row row;
         row.id = sqlite3_column_int64(st, 0);
         row.url = (const char *)sqlite3_column_text(st, 1);
@@ -291,6 +292,7 @@ int dlm_store_load_all(dlm_store *s, dlm_store_row_cb cb, void *userdata)
         cb(userdata, &row);
     }
     sqlite3_finalize(st);
+    DLM_INFO("load_all: %d rows (final rc=%d)", n, rc);
     /* A non-DONE final rc means the scan aborted mid-way (I/O error, corruption,
      * busy); report it rather than silently returning a partial load. */
     return rc == SQLITE_DONE ? 0 : -1;

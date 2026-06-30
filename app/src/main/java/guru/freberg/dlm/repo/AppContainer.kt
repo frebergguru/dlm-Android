@@ -3,6 +3,7 @@ package guru.freberg.dlm.repo
 
 import android.content.Context
 import android.os.Environment
+import guru.freberg.dlm.scheduler.QState
 import guru.freberg.dlm.scheduler.QueueScheduler
 import guru.freberg.dlm.ytdlp.YtdlpManager
 import guru.freberg.dlm.core.jni.NativeLib
@@ -73,7 +74,26 @@ class AppContainer private constructor(private val appContext: Context) {
         scope.launch {
             StatusCenter.begin("queue-load", "Loading download queue")
             runCatching { scheduler.load() }
-                .onSuccess { StatusCenter.finish("queue-load", true, "Queue loaded") }
+                .onSuccess {
+                    StatusCenter.finish("queue-load", true, "Queue loaded")
+                    // The tick loop that starts queued downloads lives in
+                    // DownloadService, which a plain app launch does NOT start. So
+                    // without this, a restored queue with resumable downloads (an
+                    // interrupted "active" row requeues to QUEUED on load) would sit
+                    // "Waiting" until the user manually acted. Start the service iff
+                    // the loaded queue actually has something to run; it self-stops
+                    // when idle, so this never leaves a needless foreground service.
+                    val snap = repository.snapshot.value
+                    val pending = snap.activeCount > 0 || snap.downloads.any {
+                        it.state == QState.QUEUED && it.enabled &&
+                            (it.force || (snap.globalAutostart && it.autostart))
+                    }
+                    // runCatching: if this load happened on a background process
+                    // start (e.g. the weekly yt-dlp worker), startForegroundService
+                    // would throw on Android 12+. Failing to resume now is fine —
+                    // the next foreground launch starts it.
+                    if (pending) runCatching { repository.ensureService() }
+                }
                 .onFailure { e ->
                     // Don't treat coroutine cancellation as a load failure: let it
                     // propagate so structured concurrency unwinds correctly.
