@@ -48,6 +48,10 @@ class DownloadService : LifecycleService() {
     private var wifiLock: WifiManager.WifiLock? = null
     private val exported = HashSet<Long>()
     private var idleTicks = 0
+    // Most recent start id; used with stopSelf(startId) so a start command that
+    // raced in during the idle-stop window isn't dropped. Touched only on the main
+    // thread (onStartCommand + the lifecycleScope tick loop), so no sync needed.
+    private var lastStartId = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -61,6 +65,7 @@ class DownloadService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        lastStartId = startId
         // Re-assert foreground in case we were restarted by the system.
         startForegroundNow(repo.snapshot.value)
         // Revive ticking: the loop self-terminates when the queue goes idle, so a
@@ -80,9 +85,17 @@ class DownloadService : LifecycleService() {
                     updateLocks(snap)
                     if (!hasWork(snap)) {
                         if (++idleTicks >= IDLE_TICKS_BEFORE_STOP) {
-                            stopForeground(STOP_FOREGROUND_REMOVE)
-                            stopSelf()
-                            break
+                            // Re-check against the freshest snapshot: work may have
+                            // been queued since this tick read `snap`. stopSelf(startId)
+                            // additionally lets a start command that raced in keep the
+                            // service alive rather than being dropped by a bare stopSelf().
+                            if (hasWork(repo.snapshot.value)) {
+                                idleTicks = 0
+                            } else {
+                                stopForeground(STOP_FOREGROUND_REMOVE)
+                                stopSelf(lastStartId)
+                                break
+                            }
                         }
                     } else {
                         idleTicks = 0

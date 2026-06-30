@@ -67,8 +67,14 @@ Java_guru_freberg_dlm_core_jni_NativeAuth_nLoginPassword(JNIEnv *env, jobject th
     int rc = (e && p) ? dlm_ia_login_password(e, p, &err) : -1;
     free(e); free(p);
     jstring out = NULL;
-    if (rc != 0)
+    if (rc != 0) {
         out = jstr_new(env, err ? err : "login failed");
+        // null here means failure (rc != 0) but the error string couldn't be
+        // built (OOM). The Kotlin side reads null as *success*, so make the
+        // failure explicit with a thrown exception instead (no-op if jstr_new
+        // already left a pending OutOfMemoryError).
+        if (!out) jni_throw_runtime(env, "login failed");
+    }
     free(err);
     return out;
 }

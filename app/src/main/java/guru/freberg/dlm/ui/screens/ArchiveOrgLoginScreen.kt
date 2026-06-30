@@ -91,7 +91,13 @@ fun ArchiveOrgLoginScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onB
                         onClick = {
                             busy = true
                             scope.launch {
-                                val err = withContext(Dispatchers.IO) { repo.loginPassword(email.trim(), password) }
+                                // loginPassword returns null on success or an error
+                                // string on failure; a thrown exception (e.g. OOM
+                                // building the message) is also a failure, not success.
+                                val err = withContext(Dispatchers.IO) {
+                                    runCatching { repo.loginPassword(email.trim(), password) }
+                                        .getOrElse { it.message ?: "unknown error" }
+                                }
                                 message = err?.let { "Sign-in failed: $it" }
                                 status = withContext(Dispatchers.IO) { repo.authStatus() }
                                 if (err == null) password = ""

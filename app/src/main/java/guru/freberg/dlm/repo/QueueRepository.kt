@@ -67,9 +67,10 @@ class QueueRepository(
         return pkgId
     }
 
-    /** Add [url] straight to the download list (CLI `add` semantics). Returns the
-     * new id, or -1 if the link couldn't be resolved (we never download a page
-     * URL as raw HTML — a site/stream that yt-dlp can't resolve is a failure). */
+    /** Add [url] straight to the download list (CLI `add` semantics), started.
+     * Returns the new link id (single file) or package id (multi-file), or -1 if
+     * the link couldn't be resolved (we never download a page URL as raw HTML — a
+     * site/stream that yt-dlp can't resolve is a failure). */
     suspend fun addDirect(url: String, connections: Int = 0): Long {
         val res = resolveTasks(url) ?: return -1
         val tasks = res.tasks
@@ -78,8 +79,12 @@ class QueueRepository(
             val t = tasks[0]
             scheduler.add(t.url, t.filename, if (connections > 0) connections else 0, t.delegate)
         } else {
-            // multi-file: stage as a package instead
-            scheduler.grab(packageNameFor(res, url), null, tasks.map { it.toGrabLink() }, source = url)
+            // Multi-file (archive.org item, playlist, …): stage as a package, then
+            // confirm it straight into the download list and start it — "Download
+            // now" should download, not silently park the files in Review.
+            val pkgId = scheduler.grab(packageNameFor(res, url), null, tasks.map { it.toGrabLink() }, source = url)
+            scheduler.confirm(pkgId, isPackage = true, start = true)
+            pkgId
         }
         ensureService()
         return id
