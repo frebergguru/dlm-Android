@@ -505,6 +505,22 @@ class QueueScheduler(
         }
     }
 
+    /** Remove every errored link — cleaning up its leftover partial files — plus
+     * any package thereby left empty. */
+    suspend fun clearFailed(): Int = withContext(storeDispatcher) {
+        mutex.withLock {
+            var removed = 0
+            val failed = items.filter { it.state == QState.ERROR && it.job == null }
+            for (it in failed) {
+                val pkgId = it.packageId
+                cleanupPartialFiles(it)
+                store.delete(it.id); items.remove(it); dropIfEmpty(pkgId); removed++
+            }
+            publishLocked()
+            removed
+        }
+    }
+
     // ---- scheduler tick ---------------------------------------------------
 
     /** Start eligible items. Call regularly (≈200ms) from the Service loop. */

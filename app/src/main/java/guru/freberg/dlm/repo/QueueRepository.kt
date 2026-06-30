@@ -193,6 +193,7 @@ class QueueRepository(
     suspend fun pkgUpdate(id: Long, name: String?, folder: String?, comment: String?, priority: Int, collapsed: Int) =
         scheduler.pkgUpdate(id, name, folder, comment, priority, collapsed)
     suspend fun clearFinished() = scheduler.clearFinished()
+    suspend fun clearFailed() = scheduler.clearFailed()
 
     // ---- global settings --------------------------------------------------
 

@@ -143,6 +143,7 @@ class QueueViewModel(app: Application) : AndroidViewModel(app) {
     fun move(id: Long, isPackage: Boolean, dir: MoveDir) =
         viewModelScope.launch { repo.move(id, isPackage, dir) }
     fun clearFinished() = viewModelScope.launch { repo.clearFinished() }
+    fun clearFailed() = viewModelScope.launch { repo.clearFailed() }
     fun export(link: guru.freberg.dlm.scheduler.LinkSnap) = viewModelScope.launch {
         // Same <host>/<title> layout as the automatic post-download move.
         val pkgName = snapshot.value.packages.associate { it.id to it.name }

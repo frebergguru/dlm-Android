@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -67,11 +68,14 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
     val running = statusItems.any { it.state == guru.freberg.dlm.repo.StatusState.RUNNING }
     var sheetLink by remember { mutableStateOf<LinkSnap?>(null) }
     var sheetPkg by remember { mutableStateOf<PkgSnap?>(null) }
+    var confirmClearFinished by remember { mutableStateOf(false) }
+    var confirmClearFailed by remember { mutableStateOf(false) }
 
     val downloads = snap.downloads
     val pkgs = snap.packages.filter { it.list == ListKind.DOWNLOAD }
     val pkgIds = pkgs.mapTo(HashSet()) { it.id }
     val hasFinished = downloads.any { it.state == QState.DONE }
+    val hasFailed = downloads.any { it.state == QState.ERROR }
 
     // Same grouping model as the Review tab: by site, by package, or both. A link's
     // site is its package's source-URL host when packaged (extractor task URLs can be
@@ -108,7 +112,14 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
                             contentDescription = if (snap.globalAutostart) "Pause all" else "Resume all",
                         )
                     }
-                    if (hasFinished) IconButton(onClick = { vm.clearFinished() }) {
+                    if (hasFailed) IconButton(onClick = { confirmClearFailed = true }) {
+                        Icon(
+                            Icons.Filled.DeleteForever,
+                            contentDescription = "Clear failed",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    if (hasFinished) IconButton(onClick = { confirmClearFinished = true }) {
                         Icon(Icons.Filled.DeleteSweep, "Clear finished")
                     }
                 },
@@ -194,6 +205,27 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
 
     sheetLink?.let { LinkActionsSheet(vm, it, onDismiss = { sheetLink = null }) }
     sheetPkg?.let { PackageActionsSheet(vm, it, isLinkgrabber = false, onDismiss = { sheetPkg = null }) }
+
+    if (confirmClearFailed) {
+        val n = downloads.count { it.state == QState.ERROR }
+        ConfirmDialog(
+            title = "Clear failed downloads?",
+            message = "$n failed ${if (n == 1) "download" else "downloads"} and any partial files will be removed.",
+            confirmLabel = "Clear",
+            onConfirm = { vm.clearFailed(); confirmClearFailed = false },
+            onDismiss = { confirmClearFailed = false },
+        )
+    }
+    if (confirmClearFinished) {
+        val n = downloads.count { it.state == QState.DONE }
+        ConfirmDialog(
+            title = "Clear finished downloads?",
+            message = "$n finished ${if (n == 1) "download" else "downloads"} will be removed from the list. The downloaded files are kept.",
+            confirmLabel = "Clear",
+            onConfirm = { vm.clearFinished(); confirmClearFinished = false },
+            onDismiss = { confirmClearFinished = false },
+        )
+    }
 }
 
 /** How far a package group is inset under its site header in the SITE_PKG view. */
