@@ -89,4 +89,3 @@ is published on the scheduler's `StateFlow`. See [Scheduler.md](Scheduler.md) an
 - **The C core stays verbatim** wherever possible; Android-specific behaviour is
   injected at the edges (JNI, CA hook, XDG `setenv`). See
   [Contributing.md](Contributing.md).
-</content>

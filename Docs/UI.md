@@ -63,4 +63,3 @@ success so transient failures retry, and bounding the dedup set to current items
 `StatusCenter` is a process-wide, synchronized record of background activities
 (runtime setup, yt-dlp updates, queue load) surfaced by the Status screen, so the
 user can see what the app is doing and whether it succeeded.
-</content>

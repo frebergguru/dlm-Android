@@ -72,7 +72,7 @@ cmake, make, perl, curl).
 
 > The yt-dlp runtime (Python + yt-dlp + ffmpeg) is **not** bundled in the APK.
 > It is **downloaded and set up automatically on first use** (or from Settings →
-> "Set up / update now"), then yt-dlp self-updates in the background.
+> "Set up now"), then yt-dlp self-updates in the background.
 
 ## Features (parity with desktop dlm)
 

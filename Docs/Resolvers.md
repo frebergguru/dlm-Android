@@ -103,4 +103,3 @@ link") when input is rejected, native extraction needs yt-dlp but it isn't ready
 or the fallback doesn't apply. `crawl` stages results into the linkgrabber;
 `addDirect` adds straight to the download list (single task) or stages a package
 (multiple).
-</content>

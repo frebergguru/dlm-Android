@@ -105,4 +105,3 @@ Versions live in `gradle/libs.versions.toml`. The youtubedl-android fork
 coordinates/version are pinned there; adjust if a newer release changes the API.
 JitPack is scoped via `content { … }` in `settings.gradle.kts` so only the
 youtubedl/GitHub groups can resolve from it (supply-chain hygiene).
-</content>

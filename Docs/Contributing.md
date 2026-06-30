@@ -65,4 +65,3 @@ See [JNIBridge.md](JNIBridge.md).
 - Don't commit secrets or a release keystore; signing config must read from the
   environment (see [Build.md](Build.md)).
 - `nativeDeps/` is produced by `scripts/build-deps.sh`; don't hand-edit it.
-</content>

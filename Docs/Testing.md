@@ -63,4 +63,3 @@ These are pure-JVM (no device/emulator) and run in seconds.
   a finished file auto-exports to the chosen SAF folder.
 - Background the app during a download (foreground service + wakelock keep it
   alive); confirm the notification updates and the service self-stops when idle.
-</content>

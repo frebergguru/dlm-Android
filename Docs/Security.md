@@ -98,4 +98,3 @@ set. See [Build.md](Build.md).
 - archive.org metadata cookie values aren't CR/LF-checked (trusted TLS source).
 - Generic-file fallback can save a non-media HTML page if a user forces it; gated
   on yt-dlp being READY to avoid the common accidental case.
-</content>

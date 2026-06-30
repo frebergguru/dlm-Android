@@ -8,6 +8,7 @@ quick project overview and build quick-start, see the top-level
 
 | Doc | What it covers |
 |-----|----------------|
+| [UserGuide.md](UserGuide.md) | End-user guide: every action available in the app, screen by screen. |
 | [Architecture.md](Architecture.md) | Module layout, end-to-end data flow, threading model, process lifecycle. |
 | [Build.md](Build.md) | Toolchain, native dependency build, ABIs/splits, CMake hardening, release signing. |
 | [NativeCore.md](NativeCore.md) | The vendored C engine (`libdlm`): segmented download + resume, store, verify, IA auth, utilities. |
@@ -38,5 +39,3 @@ user-chosen folder via the Storage Access Framework.
 - "Verbatim core" = C reused unchanged from the desktop dlm; see
   [Contributing.md](Contributing.md) for what may and may not be edited.
 - Code is licensed **GPL-3.0-or-later**; see [`../LICENSE`](../LICENSE).
-</content>
-</invoke>

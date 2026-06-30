@@ -72,4 +72,3 @@ foreground notification, and the wake/Wi-Fi locks, and self-stops when
 
 The scheduler's behaviour is verified by JVM tests that mirror the upstream
 `test_queue.c` / `test_package.c` (`app/src/test/...`). See [Testing.md](Testing.md).
-</content>

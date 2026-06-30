@@ -80,4 +80,3 @@ during the transfer — the blocking native call is never interrupted.
 the other wrappers declare instance externals (receiving a `jobject`). Each C
 file's function naming/registration matches its Kotlin declaration — keep them
 consistent if you add methods.
-</content>

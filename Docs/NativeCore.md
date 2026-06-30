@@ -126,4 +126,3 @@ See [Resolvers.md](Resolvers.md) for the end-to-end resolve flow.
   the first suffix letter, so `"1.5 MiB"` round-trips.
 - `dlm_set_ca_bundle` / `dlm_ca_bundle` hold the CA path applied as
   `CURLOPT_CAINFO`. Set once from `jni_init.c::nativeInit`.
-</content>
