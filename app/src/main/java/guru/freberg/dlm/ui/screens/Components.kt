@@ -71,7 +71,7 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import guru.freberg.dlm.ui.theme.stateAccent
-import guru.freberg.dlm.ui.util.faviconUrl
+import guru.freberg.dlm.ui.util.faviconModel
 import guru.freberg.dlm.ui.util.fileTypeIcon
 import guru.freberg.dlm.ui.util.hostOf
 import guru.freberg.dlm.ui.util.formatBytes
@@ -230,13 +230,13 @@ private fun friendlyError(err: String?): String = when (err) {
  */
 @Composable
 fun SiteIcon(host: String, modifier: Modifier = Modifier.size(24.dp)) {
-    val url = faviconUrl(host)
+    val model = faviconModel(host)
     val context = LocalPlatformContext.current
     var failed by remember(host) { mutableStateOf(false) }
     Box(modifier, contentAlignment = Alignment.Center) {
         Icon(Icons.Filled.QuestionMark, null, modifier = Modifier.matchParentSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (url != null && !failed) {
-            val request = remember(url) { ImageRequest.Builder(context).data(url).size(48).build() }
+        if (model != null && !failed) {
+            val request = remember(model) { ImageRequest.Builder(context).data(model).size(48).build() }
             AsyncImage(
                 model = request,
                 contentDescription = null,

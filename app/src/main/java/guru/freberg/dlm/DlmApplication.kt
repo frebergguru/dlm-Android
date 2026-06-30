@@ -8,8 +8,13 @@ import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import okhttp3.Cache
+import okhttp3.OkHttpClient
 import okio.Path.Companion.toPath
 import guru.freberg.dlm.repo.AppContainer
+import guru.freberg.dlm.ui.util.FaviconFetcher
+import guru.freberg.dlm.ui.util.SiteIcon
+import guru.freberg.dlm.ui.util.SiteIconKeyer
 import guru.freberg.dlm.ytdlp.YtdlpUpdateWorker
 
 /** Builds the process-wide [AppContainer] (native init + scheduler) at startup. */
@@ -25,12 +30,21 @@ class DlmApplication : Application(), SingletonImageLoader.Factory {
         YtdlpUpdateWorker.schedule(this)
     }
 
-    /** Coil image loader for site favicons: an explicit OkHttp network fetcher
-     * (so the https fetch works regardless of classpath auto-detection) plus
-     * Coil's default on-disk cache. */
-    override fun newImageLoader(context: PlatformContext): ImageLoader =
-        ImageLoader.Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory()) }
+    /** Coil image loader for site favicons. [FaviconFetcher] resolves a
+     * non-bundled host by parsing its page for `<link rel="icon">` (largest
+     * declared size wins) with a /favicon.ico fallback; a shared OkHttp client
+     * (HTTP-cached on disk) serves both that and any plain https image, so the
+     * fetch works regardless of classpath auto-detection. */
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        val client = OkHttpClient.Builder()
+            .cache(Cache(context.cacheDir.resolve("favicon_http_cache"), 8L * 1024 * 1024))
+            .build()
+        return ImageLoader.Builder(context)
+            .components {
+                add(SiteIconKeyer(), SiteIcon::class)
+                add(FaviconFetcher.Factory(client), SiteIcon::class)
+                add(OkHttpNetworkFetcherFactory(callFactory = { client }))
+            }
             // Favicons are tiny; cap the in-memory cache well below Coil's 25%-of-heap
             // default so the image loader never becomes a memory hog.
             .memoryCache { MemoryCache.Builder().maxSizeBytes(8L * 1024 * 1024).build() }
@@ -43,4 +57,5 @@ class DlmApplication : Application(), SingletonImageLoader.Factory {
                     .build()
             }
             .build()
+    }
 }

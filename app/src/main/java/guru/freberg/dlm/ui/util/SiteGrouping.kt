@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm.ui.util
 
+import java.net.URI
+
 /**
  * Pure-Kotlin mirrors of the desktop GTK port's link helpers (gui/main.c @
  * 91acb67): clipboard URL detection and site grouping. Kept free of Android
@@ -110,10 +112,75 @@ private fun bundledFavicon(host: String): String? {
     return "file:///android_asset/favicons/$key.png"
 }
 
-/** The favicon source for a real [host], or null for a blank host. Prefers a
- * bundled PNG for well-known sites; otherwise falls back to the site's own
- * /favicon.ico (which renders only when it isn't a true ICO). */
-fun faviconUrl(host: String): String? = when {
+/**
+ * A non-bundled site whose favicon must be discovered at load time by parsing
+ * its HTML for `<link rel="icon">` (falling back to /favicon.ico). Used as a
+ * Coil image model so [FaviconFetcher] resolves and fetches it off the UI thread.
+ */
+data class SiteIcon(val host: String)
+
+/** Coil image model for a real [host]'s site icon, or null for a blank host.
+ * A well-known site uses its bundled PNG; any other host becomes a [SiteIcon]
+ * so its page is parsed for the best `<link rel="icon">` at load time. */
+fun faviconModel(host: String): Any? = when {
     host.isEmpty() -> null
-    else -> bundledFavicon(host) ?: "https://$host/favicon.ico"
+    else -> bundledFavicon(host) ?: SiteIcon(host)
+}
+
+private val LINK_TAG = Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE)
+
+/** Value of a [tag]'s [name] attribute (double/single/unquoted), or null. */
+private fun tagAttr(tag: String, name: String): String? {
+    val m = Regex("\\b$name\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))", RegexOption.IGNORE_CASE)
+        .find(tag) ?: return null
+    return m.groupValues[1].ifEmpty { m.groupValues[2].ifEmpty { m.groupValues[3] } }.ifEmpty { null }
+}
+
+/** Largest pixel dimension declared in a `sizes` attribute (e.g. "32x32 16x16"
+ * -> 32), or 0 when absent, "any", or unparseable. */
+private fun maxDeclaredSize(sizes: String?): Int {
+    if (sizes == null) return 0
+    return Regex("(\\d+)\\s*[xX]\\s*(\\d+)").findAll(sizes)
+        .flatMap { sequenceOf(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
+        .maxOrNull() ?: 0
+}
+
+/** Higher = more likely to decode on Android. ICO/SVG aren't handled by the
+ * platform image decoder, so they rank below raster formats. */
+private fun formatRank(url: String): Int =
+    when (url.substringBefore('?').substringBefore('#').substringAfterLast('.').lowercase()) {
+        "png", "webp", "jpg", "jpeg", "gif" -> 2
+        "ico", "svg" -> 0
+        else -> 1
+    }
+
+/** Resolve [href] against [pageUrl] to an absolute http(s) URL, or null. */
+private fun resolveUrl(pageUrl: String, href: String): String? = try {
+    URI(pageUrl).resolve(URI(href)).toString()
+        .takeIf { it.startsWith("http://") || it.startsWith("https://") }
+} catch (_: Exception) {
+    null
+}
+
+/**
+ * Pick the best icon URL declared by a page's `<link rel="icon">` tags (also
+ * `shortcut icon`, `apple-touch-icon`, `mask-icon`), resolved absolute against
+ * [pageUrl]. Prefers the largest declared `sizes`; among equal sizes, prefers a
+ * format Android can decode (png/webp/jpg over ico/svg). Returns null when the
+ * HTML declares no usable icon link.
+ */
+fun selectIconHref(html: String, pageUrl: String): String? {
+    var best: Triple<String, Int, Int>? = null // url, declared size, format rank
+    for (tag in LINK_TAG.findAll(html)) {
+        val t = tag.value
+        if (tagAttr(t, "rel")?.contains("icon", ignoreCase = true) != true) continue
+        val href = tagAttr(t, "href")?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+        if (href.startsWith("data:", ignoreCase = true)) continue
+        val url = resolveUrl(pageUrl, href) ?: continue
+        val size = maxDeclaredSize(tagAttr(t, "sizes"))
+        val rank = formatRank(url)
+        val better = best == null || if (size != best.second) size > best.second else rank > best.third
+        if (better) best = Triple(url, size, rank)
+    }
+    return best?.first
 }

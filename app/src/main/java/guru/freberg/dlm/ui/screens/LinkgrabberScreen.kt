@@ -65,7 +65,7 @@ import guru.freberg.dlm.scheduler.ListKind
 import guru.freberg.dlm.scheduler.PkgSnap
 import guru.freberg.dlm.ui.GroupMode
 import guru.freberg.dlm.ui.QueueViewModel
-import guru.freberg.dlm.ui.util.faviconUrl
+import guru.freberg.dlm.ui.util.faviconModel
 import guru.freberg.dlm.ui.util.fileTypeIcon
 import guru.freberg.dlm.ui.util.formatBytes
 import guru.freberg.dlm.ui.util.hostOf
@@ -290,16 +290,16 @@ private fun SiteHeader(
  * A host whose fetch fails is marked so it isn't requested again. */
 @Composable
 private fun SiteFavicon(host: String, failed: Boolean, onFail: () -> Unit) {
-    val url = faviconUrl(host)
+    val model = faviconModel(host)
     val context = LocalPlatformContext.current
     Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
         // A question mark shows through until (and unless) the favicon paints over it.
         Icon(Icons.Filled.QuestionMark, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (url != null && !failed) {
+        if (model != null && !failed) {
             // Decode/cache at the 24dp render size (~48px @2x) instead of the source
             // resolution, so favicons cost only a few KB of bitmap memory each.
-            val request = remember(url) {
-                ImageRequest.Builder(context).data(url).size(48).build()
+            val request = remember(model) {
+                ImageRequest.Builder(context).data(model).size(48).build()
             }
             AsyncImage(
                 model = request,

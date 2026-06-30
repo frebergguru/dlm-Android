@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package guru.freberg.dlm
 
+import guru.freberg.dlm.ui.util.SiteIcon
 import guru.freberg.dlm.ui.util.detectUrl
-import guru.freberg.dlm.ui.util.faviconUrl
+import guru.freberg.dlm.ui.util.faviconModel
 import guru.freberg.dlm.ui.util.hostOf
 import guru.freberg.dlm.ui.util.isSafeDownloadInput
+import guru.freberg.dlm.ui.util.selectIconHref
 import guru.freberg.dlm.ui.util.siteLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -120,8 +122,46 @@ class SiteGroupingTest {
         assertFalse(isSafeDownloadInput("   "))
     }
 
-    @Test fun faviconUrl_realHostsOnly() {
-        assertEquals("https://example.com/favicon.ico", faviconUrl("example.com"))
-        assertNull(faviconUrl(""))
+    @Test fun faviconModel_bundledOrDiscovered() {
+        // Well-known site: its bundled PNG asset.
+        assertEquals("file:///android_asset/favicons/github.com.png", faviconModel("github.com"))
+        // Any other host: discovered at load time from its HTML.
+        assertEquals(SiteIcon("example.com"), faviconModel("example.com"))
+        assertNull(faviconModel(""))
+    }
+
+    @Test fun selectIconHref_resolvesRelativeHref() {
+        val html = """<link rel="icon" href="/img/icon.png">"""
+        assertEquals("https://example.com/img/icon.png", selectIconHref(html, "https://example.com/page"))
+    }
+
+    @Test fun selectIconHref_resolvesProtocolRelativeHref() {
+        val html = """<link rel="icon" href="//cdn.example.net/i.png">"""
+        assertEquals("https://cdn.example.net/i.png", selectIconHref(html, "https://example.com/"))
+    }
+
+    @Test fun selectIconHref_prefersLargestDeclaredSize() {
+        val html = """
+            <link rel="icon" sizes="16x16" href="/small.png">
+            <link rel="apple-touch-icon" sizes="180x180" href="/large.png">
+            <link rel="icon" sizes="32x32" href="/medium.png">
+        """.trimIndent()
+        assertEquals("https://example.com/large.png", selectIconHref(html, "https://example.com/"))
+    }
+
+    @Test fun selectIconHref_prefersDecodableFormatOnSizeTie() {
+        val html = """
+            <link rel="shortcut icon" href="/favicon.ico">
+            <link rel="icon" href="/favicon.png">
+        """.trimIndent()
+        assertEquals("https://example.com/favicon.png", selectIconHref(html, "https://example.com/"))
+    }
+
+    @Test fun selectIconHref_ignoresNonIconAndDataLinks() {
+        val html = """
+            <link rel="stylesheet" href="/style.css">
+            <link rel="icon" href="data:image/png;base64,AAAA">
+        """.trimIndent()
+        assertNull(selectIconHref(html, "https://example.com/"))
     }
 }
