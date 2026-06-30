@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.VerticalAlignTop
@@ -82,14 +82,14 @@ import guru.freberg.dlm.ui.util.formatEta
 /* ----------------------------------------------------------------------- */
 
 @Composable
-fun DownloadRow(vm: QueueViewModel, link: LinkSnap, onMenu: (LinkSnap) -> Unit) {
+fun DownloadRow(vm: QueueViewModel, link: LinkSnap, onMenu: (LinkSnap) -> Unit, indent: Dp = 0.dp) {
     val accent = stateAccent(
         done = link.state == QState.DONE,
         error = link.state == QState.ERROR,
         paused = link.state == QState.PAUSED,
         active = link.state == QState.ACTIVE,
     )
-    Column(Modifier.fillMaxWidth().clickable { onMenu(link) }.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)) {
+    Column(Modifier.padding(start = indent).fillMaxWidth().clickable { onMenu(link) }.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TypeAvatar(link.name, accent, hostOf(link.url))
             Spacer(Modifier.width(12.dp))
@@ -223,9 +223,10 @@ private fun friendlyError(err: String?): String = when (err) {
 /* ----------------------------------------------------------------------- */
 
 /**
- * A small site icon: the real favicon once it loads, otherwise a generic globe.
- * Self-contained (Coil disk/memory-cached, ~48px) so it can be reused anywhere a
- * site needs identifying — Review site headers and Downloads package headers alike.
+ * A small site icon: the real favicon once it loads, otherwise a question mark
+ * (the site couldn't be identified). Self-contained (Coil disk/memory-cached,
+ * ~48px) so it can be reused anywhere a site needs identifying — Review site
+ * headers and Downloads package headers alike.
  */
 @Composable
 fun SiteIcon(host: String, modifier: Modifier = Modifier.size(24.dp)) {
@@ -233,7 +234,7 @@ fun SiteIcon(host: String, modifier: Modifier = Modifier.size(24.dp)) {
     val context = LocalPlatformContext.current
     var failed by remember(host) { mutableStateOf(false) }
     Box(modifier, contentAlignment = Alignment.Center) {
-        Icon(Icons.Filled.Public, null, modifier = Modifier.matchParentSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(Icons.Filled.QuestionMark, null, modifier = Modifier.matchParentSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         if (url != null && !failed) {
             val request = remember(url) { ImageRequest.Builder(context).data(url).size(48).build() }
             AsyncImage(

@@ -26,7 +26,7 @@ import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -293,8 +293,8 @@ private fun SiteFavicon(host: String, failed: Boolean, onFail: () -> Unit) {
     val url = faviconUrl(host)
     val context = LocalPlatformContext.current
     Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-        // Globe shows through until (and unless) the favicon paints over it.
-        Icon(Icons.Filled.Public, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        // A question mark shows through until (and unless) the favicon paints over it.
+        Icon(Icons.Filled.QuestionMark, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         if (url != null && !failed) {
             // Decode/cache at the 24dp render size (~48px @2x) instead of the source
             // resolution, so favicons cost only a few KB of bitmap memory each.
