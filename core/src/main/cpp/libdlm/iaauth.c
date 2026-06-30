@@ -142,9 +142,22 @@ static int save_root(json_t *ia)
     return 0;
 }
 
+/* Reject credential values containing control characters. These values are later
+ * interpolated into "Authorization:" / "Cookie:" request headers (dlm_ia_auth_
+ * headers), where an embedded CR/LF would split the header line and inject
+ * attacker-chosen request headers. No legitimate S3 key or session cookie
+ * contains control characters, so a hard reject is safe. */
+static int has_ctrl_char(const char *s)
+{
+    for (; *s; s++)
+        if ((unsigned char)*s < 0x20 || (unsigned char)*s == 0x7f) return 1;
+    return 0;
+}
+
 int dlm_ia_save_s3(const char *access, const char *secret)
 {
     if (!access || !secret) return -1;
+    if (has_ctrl_char(access) || has_ctrl_char(secret)) return -1;
     json_t *ia = json_object();
     json_object_set_new(ia, "mode", json_string("s3"));
     json_object_set_new(ia, "access", json_string(access));
@@ -155,6 +168,7 @@ int dlm_ia_save_s3(const char *access, const char *secret)
 int dlm_ia_save_cookie(const char *cookie)
 {
     if (!cookie) return -1;
+    if (has_ctrl_char(cookie)) return -1;
     json_t *ia = json_object();
     json_object_set_new(ia, "mode", json_string("cookie"));
     json_object_set_new(ia, "cookie", json_string(cookie));
