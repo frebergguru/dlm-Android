@@ -37,6 +37,11 @@ class QItem(
     @Volatile var cancelRequested: Boolean = false
     var pauseRequested: Boolean = false
     var removeRequested: Boolean = false
+    // True while this item was stopped by the global "Pause all" toggle (as opposed
+    // to a manual per-item pause), so "Resume all" re-queues exactly these and leaves
+    // individually-paused items untouched. Not persisted: a global pause doesn't
+    // survive a restart (like [force]).
+    var globallyPaused: Boolean = false
 
     /** Signal the worker to stop. Engine reads the native cancel cell; the
      * yt-dlp runner polls [cancelRequested]. */

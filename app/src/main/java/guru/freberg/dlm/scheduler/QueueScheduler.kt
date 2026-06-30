@@ -267,6 +267,7 @@ class QueueScheduler(
         mutex.withLock {
             val it = find(id) ?: return@withLock -1
             it.force = false
+            it.globallyPaused = false // an explicit per-item pause isn't a global one
             when (it.state) {
                 QState.ACTIVE -> { it.pauseRequested = true; it.requestCancel() }
                 QState.QUEUED -> { it.state = QState.PAUSED; store.setState(id, "paused", null) }
@@ -282,6 +283,7 @@ class QueueScheduler(
             if (it.state == QState.PAUSED || it.state == QState.ERROR) {
                 it.state = QState.QUEUED
                 it.resetCancel()
+                it.globallyPaused = false
                 it.error = null
                 store.setState(id, "queued", null)
                 publishLocked(); 0
@@ -457,7 +459,35 @@ class QueueScheduler(
 
     suspend fun setMaxActive(v: Int) = mutex.withLock { maxActive = v.coerceAtLeast(1); publishLocked() }
     suspend fun setMaxSpeed(v: Long) = mutex.withLock { if (v >= 0) maxSpeed = v; publishLocked() }
-    suspend fun setGlobalAutostart(on: Boolean) = mutex.withLock { globalAutostart = on; publishLocked() }
+    /**
+     * Toggle the global "Pause all" / "Resume all" state. Beyond gating which
+     * QUEUED items the tick loop may start, this also stops or restarts in-flight
+     * workers so the button actually pauses active downloads (not just future
+     * ones). Items stopped here are tagged [QItem.globallyPaused] so resuming
+     * re-queues exactly them, leaving manually-paused links paused.
+     */
+    suspend fun setGlobalAutostart(on: Boolean) = mutex.withLock {
+        globalAutostart = on
+        if (on) {
+            // Resume: re-queue everything we globally paused. Items still winding
+            // down (ACTIVE, mid-cancel) are handled by finalizeWorker, which routes
+            // a globally-paused cancellation back to QUEUED while autostart is on.
+            for (it in items) if (it.globallyPaused && it.state == QState.PAUSED) {
+                it.globallyPaused = false
+                it.state = QState.QUEUED
+                it.resetCancel()
+                store.setState(it.id, "queued", null)
+            }
+        } else {
+            // Pause: cancel active workers; finalizeWorker settles them to PAUSED.
+            for (it in items) if (it.job != null && it.state == QState.ACTIVE) {
+                it.globallyPaused = true
+                it.pauseRequested = true
+                it.requestCancel()
+            }
+        }
+        publishLocked()
+    }
 
     /** Remove every finished link plus any package thereby left empty. */
     suspend fun clearFinished(): Int = withContext(storeDispatcher) {
@@ -512,6 +542,7 @@ class QueueScheduler(
     private fun startItem(it: QItem): Boolean {
         it.state = QState.ACTIVE
         it.resetCancel()
+        it.globallyPaused = false
         store.setState(it.id, "active", null)
 
         val perRate = if (maxSpeed > 0) (maxSpeed / maxActive.coerceAtLeast(1)).coerceAtLeast(1) else 0
@@ -584,9 +615,16 @@ class QueueScheduler(
 
             it.state = when (rc) {
                 DLM_OK -> QState.DONE
-                DLM_ERR_CANCELLED -> QState.PAUSED
+                // A globally-paused worker that finished cancelling *after* the user
+                // already hit "Resume all" goes straight back to QUEUED; otherwise a
+                // cancellation parks the item as PAUSED.
+                DLM_ERR_CANCELLED ->
+                    if (it.globallyPaused && globalAutostart) QState.QUEUED else QState.PAUSED
                 else -> { it.error = dlmStrerror(rc); QState.ERROR }
             }
+            // The global-pause tag only stays meaningful while the item is parked
+            // as PAUSED waiting for "Resume all"; clear it once it lands anywhere else.
+            if (it.state != QState.PAUSED) it.globallyPaused = false
             // Delegated (yt-dlp) downloads only report a 0–100 percentage; on success
             // record the real on-disk size so the UI shows e.g. "463 KiB", not "100 B".
             if (it.state == QState.DONE) {

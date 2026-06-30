@@ -310,7 +310,9 @@ fun LinkActionsSheet(vm: QueueViewModel, link: LinkSnap, onDismiss: () -> Unit) 
                     SheetItem(Icons.Filled.PlayArrow, "Resume") { vm.resume(link.id); onDismiss() }
                 else -> {}
             }
-            if (link.state != QState.DONE)
+            // "Start now" expedites a not-yet-running link; hide it once the link is
+            // already downloading (ACTIVE) or finished (DONE).
+            if (link.state != QState.DONE && link.state != QState.ACTIVE)
                 SheetItem(Icons.Filled.Bolt, "Start now") { vm.force(link.id, false); onDismiss() }
             if (link.state == QState.DONE)
                 SheetItem(Icons.Filled.IosShare, "Save to folder…") { vm.export(link); onDismiss() }
