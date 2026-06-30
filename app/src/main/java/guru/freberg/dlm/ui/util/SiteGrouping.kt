@@ -90,6 +90,30 @@ fun siteLabel(host: String): String = when {
     else -> host
 }
 
-/** The favicon URL for a real [host], or null for a blank host (no real site). */
-fun faviconUrl(host: String): String? =
-    if (host.isEmpty()) null else "https://$host/favicon.ico"
+/** Well-known sites we ship a pre-rendered PNG favicon for, under
+ * assets/favicons/<domain>.png. These are bundled because many sites serve only
+ * an `.ico` favicon, which Android's image decoder can't read — and so it never
+ * loads a third-party favicon service at runtime (no host leaks off-device). */
+private val BUNDLED_FAVICONS = setOf(
+    "archive.org", "wikipedia.org", "wikimedia.org", "youtube.com", "vimeo.com",
+    "dailymotion.com", "soundcloud.com", "bandcamp.com", "github.com", "gitlab.com",
+    "sourceforge.net", "reddit.com", "twitter.com", "x.com", "facebook.com",
+    "tiktok.com", "twitch.tv", "imgur.com", "mediafire.com", "mega.nz",
+    "dropbox.com", "flickr.com", "deviantart.com", "tumblr.com", "pixiv.net",
+    "nrk.no", "bbc.co.uk", "bbc.com", "rumble.com", "vgtv.no",
+)
+
+/** A bundled-asset model for [host] if it (or its parent domain) is well-known. */
+private fun bundledFavicon(host: String): String? {
+    val h = host.lowercase()
+    val key = BUNDLED_FAVICONS.firstOrNull { h == it || h.endsWith(".$it") } ?: return null
+    return "file:///android_asset/favicons/$key.png"
+}
+
+/** The favicon source for a real [host], or null for a blank host. Prefers a
+ * bundled PNG for well-known sites; otherwise falls back to the site's own
+ * /favicon.ico (which renders only when it isn't a true ICO). */
+fun faviconUrl(host: String): String? = when {
+    host.isEmpty() -> null
+    else -> bundledFavicon(host) ?: "https://$host/favicon.ico"
+}
