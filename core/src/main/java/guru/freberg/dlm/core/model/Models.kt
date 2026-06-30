@@ -35,7 +35,10 @@ data class StoreRow(
 data class PackageRow(
     val id: Long,
     val name: String,
-    val folder: String,
+    // Nullable: packages created from a crawl/review (scheduler.grab) are stored with
+    // no folder, and the JNI marshals that NULL through. A non-null type here threw an
+    // NPE that aborted the entire queue load, stranding those rows in the DB.
+    val folder: String?,
     val comment: String?,
     val list: String,
     val priority: Int,
@@ -85,6 +88,9 @@ data class Task(
  */
 class ExtractResult(
     val source: String?,
+    // Human title of the resolved item (archive.org metadata title / yt-dlp title),
+    // used to name the package + its save subfolder. Null when the extractor has none.
+    val packageName: String?,
     val tasks: Array<Task>,
     val needsYtdlp: Boolean,
 )

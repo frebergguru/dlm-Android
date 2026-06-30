@@ -45,6 +45,7 @@ import guru.freberg.dlm.scheduler.ListKind
 import guru.freberg.dlm.scheduler.PkgSnap
 import guru.freberg.dlm.scheduler.QState
 import guru.freberg.dlm.ui.QueueViewModel
+import guru.freberg.dlm.ui.util.hostOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,6 +124,7 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
                             activeInPkg = links.count { it.state == QState.ACTIVE },
                             onToggle = { vm.setPackageCollapsed(pkg.id, !pkg.collapsed) },
                             onMenu = { sheetPkg = it },
+                            host = hostOf(links.firstOrNull()?.url),
                         )
                     }
                     if (!pkg.collapsed) {

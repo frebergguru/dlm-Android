@@ -17,6 +17,7 @@ import guru.freberg.dlm.ytdlp.YtdlpManager
 import guru.freberg.dlm.ytdlp.YtdlpState
 import guru.freberg.dlm.core.jni.NativeAuth
 import guru.freberg.dlm.core.jni.NativeExtract
+import guru.freberg.dlm.core.model.ExtractResult
 import guru.freberg.dlm.core.model.Task
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,10 +58,11 @@ class QueueRepository(
      * else goes through the yt-dlp runtime. Returns the new package id or -1.
      */
     suspend fun crawl(url: String): Long {
-        val tasks = resolveTasks(url) ?: return -1
+        val res = resolveTasks(url) ?: return -1
+        val tasks = res.tasks
         if (tasks.isEmpty()) return -1
         val links = tasks.map { it.toGrabLink() }
-        val name = packageNameFor(url)
+        val name = packageNameFor(res, url)
         val pkgId = scheduler.grab(name, null, links)
         return pkgId
     }
@@ -69,39 +71,58 @@ class QueueRepository(
      * new id, or -1 if the link couldn't be resolved (we never download a page
      * URL as raw HTML — a site/stream that yt-dlp can't resolve is a failure). */
     suspend fun addDirect(url: String, connections: Int = 0): Long {
-        val tasks = resolveTasks(url) ?: return -1
+        val res = resolveTasks(url) ?: return -1
+        val tasks = res.tasks
         if (tasks.isEmpty()) return -1
         val id = if (tasks.size == 1) {
             val t = tasks[0]
             scheduler.add(t.url, t.filename, if (connections > 0) connections else 0, t.delegate)
         } else {
             // multi-file: stage as a package instead
-            scheduler.grab(packageNameFor(url), null, tasks.map { it.toGrabLink() })
+            scheduler.grab(packageNameFor(res, url), null, tasks.map { it.toGrabLink() })
         }
         ensureService()
         return id
     }
 
-    private suspend fun resolveTasks(url: String): List<Task>? {
+    private suspend fun resolveTasks(url: String): ExtractResult? {
         // Boundary guard: never hand option-injection / non-network-scheme input to
         // the native engine or yt-dlp, regardless of which UI path called us.
         if (!guru.freberg.dlm.ui.util.isSafeDownloadInput(url)) return null
         val label = runCatching { Uri.parse(url).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: url
+        // Track the resolve in both the inline banner (_resolving) and the global
+        // StatusCenter, so a slow yt-dlp/playlist resolve visibly spins the Downloads
+        // activity indicator and shows progress on the Activity screen — the user is
+        // never left staring at a frozen-looking screen.
+        val statusKey = "resolve-$label-${url.hashCode()}"
         _resolving.update { it + label }
+        StatusCenter.begin(statusKey, "Checking link", label)
+        var result: ExtractResult? = null
         try {
             // archive.org/direct resolution hits the network in libcurl — keep it
             // off the main thread. yt-dlp resolution already runs on IO internally.
             val native = withContext(Dispatchers.IO) { NativeExtract.extract(url) }
-            if (!native.needsYtdlp) return native.tasks.toList()
-            ytdlp.resolve(url)?.let { return it.tasks.toList() }
-            // yt-dlp couldn't resolve it — fall back to a plain direct download so
-            // generic files (unrecognised extension / unsupported site) still work.
-            return directFallback(url)
+            result = if (!native.needsYtdlp) {
+                native
+            } else {
+                // yt-dlp can be slow, especially expanding a playlist/season.
+                StatusCenter.progress(statusKey, "Resolving $label with yt-dlp — playlists can take a moment…")
+                // yt-dlp couldn't resolve it — fall back to a plain direct download so
+                // generic files (unrecognised extension / unsupported site) still work.
+                ytdlp.resolve(url) ?: directFallback(url)
+            }
+            return result
         } finally {
             // Remove a single occurrence (two adds of the same host stay balanced).
             _resolving.update { list ->
                 val i = list.indexOf(label)
                 if (i < 0) list else list.toMutableList().also { it.removeAt(i) }
+            }
+            val n = result?.tasks?.size ?: 0
+            when {
+                n > 1 -> StatusCenter.finish(statusKey, true, "Found $n files")
+                n == 1 -> StatusCenter.finish(statusKey, true, "Ready to download")
+                else -> StatusCenter.finish(statusKey, false, "Couldn’t read that link")
             }
         }
     }
@@ -116,16 +137,21 @@ class QueueRepository(
      * HTML instead of erroring — so we don't fall back in that case. http/https
      * only, since the engine probes with an HTTP HEAD/Range request.
      */
-    private fun directFallback(url: String): List<Task>? {
+    private fun directFallback(url: String): ExtractResult? {
         if (ytdlp.state.value != YtdlpState.READY) return null
         val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
         if (scheme != "http" && scheme != "https") return null
-        return listOf(
-            Task(
-                url = url,
-                filename = NativeExtract.filenameFromUrl(url),
-                size = -1, md5 = null, sha1 = null, headers = null, delegate = 0,
+        return ExtractResult(
+            source = null,
+            packageName = null, // generic file: no item title, falls back to host
+            tasks = arrayOf(
+                Task(
+                    url = url,
+                    filename = NativeExtract.filenameFromUrl(url),
+                    size = -1, md5 = null, sha1 = null, headers = null, delegate = 0,
+                ),
             ),
+            needsYtdlp = false,
         )
     }
 
@@ -135,8 +161,11 @@ class QueueRepository(
         availability = "online",
     )
 
-    private fun packageNameFor(url: String): String =
-        Uri.parse(url).host ?: "links"
+    /** Package/folder name for a resolved item: the extractor's human title when it
+     * has one (archive.org / yt-dlp), else the host as a sensible fallback. */
+    private fun packageNameFor(res: ExtractResult, url: String): String =
+        res.packageName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: Uri.parse(url).host ?: "links"
 
     // ---- per-link / package verbs ----------------------------------------
 
@@ -185,17 +214,30 @@ class QueueRepository(
 
     fun downloadTreeUri(): String? = settings.downloadTreeUri
     fun setDownloadTreeUri(uri: String?) { settings.downloadTreeUri = uri }
-    var autoExport: Boolean
-        get() = settings.autoExport
-        set(v) { settings.autoExport = v }
 
     var clipboardMonitor: Boolean
         get() = settings.clipboardMonitor
         set(v) { settings.clipboardMonitor = v }
 
-    suspend fun exportToTree(outPath: String): Boolean {
+    /** Copy [outPath] into the chosen SAF tree (optionally a [subDir]), leaving the
+     * local original. */
+    suspend fun exportToTree(outPath: String, subDir: String? = null): Boolean {
         val uri = settings.downloadTreeUri ?: return false
-        return SafMover.export(appContext, Uri.parse(uri), File(outPath))
+        return SafMover.export(appContext, Uri.parse(uri), File(outPath), subDir)
+    }
+
+    /**
+     * Like [exportToTree], but on success removes the app-private original (and any
+     * leftover journal sidecars) so the finished file lives in the user's folder
+     * instead of being duplicated in app storage. SafMover verifies the copy landed
+     * in full before we get here, so the delete can never lose data.
+     */
+    suspend fun moveToTree(outPath: String, subDir: String? = null): Boolean {
+        if (!exportToTree(outPath, subDir)) return false
+        runCatching { File(outPath).delete() }
+        runCatching { File("$outPath.dlmpart").delete() }
+        runCatching { File("$outPath.dlmjson").delete() }
+        return true
     }
 
     // ---- service control --------------------------------------------------

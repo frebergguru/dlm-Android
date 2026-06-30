@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.VerticalAlignTop
@@ -64,8 +65,14 @@ import guru.freberg.dlm.scheduler.PkgSnap
 import guru.freberg.dlm.scheduler.Priority
 import guru.freberg.dlm.scheduler.QState
 import guru.freberg.dlm.ui.QueueViewModel
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import guru.freberg.dlm.ui.theme.stateAccent
+import guru.freberg.dlm.ui.util.faviconUrl
 import guru.freberg.dlm.ui.util.fileTypeIcon
+import guru.freberg.dlm.ui.util.hostOf
 import guru.freberg.dlm.ui.util.formatBytes
 import guru.freberg.dlm.ui.util.formatEta
 
@@ -83,7 +90,7 @@ fun DownloadRow(vm: QueueViewModel, link: LinkSnap, onMenu: (LinkSnap) -> Unit) 
     )
     Column(Modifier.fillMaxWidth().clickable { onMenu(link) }.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TypeAvatar(link.name, accent)
+            TypeAvatar(link.name, accent, hostOf(link.url))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -125,12 +132,24 @@ fun DownloadRow(vm: QueueViewModel, link: LinkSnap, onMenu: (LinkSnap) -> Unit) 
 }
 
 @Composable
-private fun TypeAvatar(name: String, accent: Color) {
-    Box(
-        Modifier.size(40.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(fileTypeIcon(name), contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+private fun TypeAvatar(name: String, accent: Color, host: String? = null) {
+    Box(Modifier.size(40.dp)) {
+        Box(
+            Modifier.matchParentSize().clip(CircleShape).background(accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(fileTypeIcon(name), contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+        }
+        // Small site-favicon badge so every row shows where the file came from.
+        if (!host.isNullOrEmpty()) {
+            SiteIcon(
+                host,
+                Modifier.align(Alignment.BottomEnd)
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface),
+            )
+        }
     }
 }
 
@@ -200,6 +219,30 @@ private fun friendlyError(err: String?): String = when (err) {
 /* Package header                                                           */
 /* ----------------------------------------------------------------------- */
 
+/**
+ * A small site icon: the real favicon once it loads, otherwise a generic globe.
+ * Self-contained (Coil disk/memory-cached, ~48px) so it can be reused anywhere a
+ * site needs identifying — Review site headers and Downloads package headers alike.
+ */
+@Composable
+fun SiteIcon(host: String, modifier: Modifier = Modifier.size(24.dp)) {
+    val url = faviconUrl(host)
+    val context = LocalPlatformContext.current
+    var failed by remember(host) { mutableStateOf(false) }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Icon(Icons.Filled.Public, null, modifier = Modifier.matchParentSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (url != null && !failed) {
+            val request = remember(url) { ImageRequest.Builder(context).data(url).size(48).build() }
+            AsyncImage(
+                model = request,
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+                onState = { state -> if (state is AsyncImagePainter.State.Error) failed = true },
+            )
+        }
+    }
+}
+
 @Composable
 fun PackageHeader(
     pkg: PkgSnap,
@@ -207,6 +250,7 @@ fun PackageHeader(
     activeInPkg: Int,
     onToggle: () -> Unit,
     onMenu: (PkgSnap) -> Unit,
+    host: String? = null,
 ) {
     Row(
         Modifier.fillMaxWidth().clickable { onToggle() }
@@ -218,7 +262,9 @@ fun PackageHeader(
             if (expanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowUp,
             contentDescription = if (expanded) "Collapse" else "Expand",
         )
-        Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
+        // Site favicon when the package's host is known, else a generic folder.
+        if (!host.isNullOrEmpty()) SiteIcon(host, Modifier.padding(horizontal = 8.dp).size(24.dp))
+        else Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
         Column(Modifier.weight(1f)) {
             Text(pkg.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -265,7 +311,7 @@ fun LinkActionsSheet(vm: QueueViewModel, link: LinkSnap, onDismiss: () -> Unit) 
             if (link.state != QState.DONE)
                 SheetItem(Icons.Filled.Bolt, "Start now") { vm.force(link.id, false); onDismiss() }
             if (link.state == QState.DONE)
-                SheetItem(Icons.Filled.IosShare, "Save to folder…") { vm.export(link.outPath); onDismiss() }
+                SheetItem(Icons.Filled.IosShare, "Save to folder…") { vm.export(link); onDismiss() }
 
             SheetItem(Icons.Filled.Schedule, if (link.autostart) "Start manually" else "Start automatically") {
                 vm.setAutostart(link.id, false, !link.autostart); onDismiss()

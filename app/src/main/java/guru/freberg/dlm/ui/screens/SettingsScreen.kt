@@ -55,7 +55,6 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
     val clipboardMonitor by vm.clipboardMonitor.collectAsState()
 
     var limitText by remember { mutableStateOf(if (snap.maxSpeed > 0) vm.formatRate(snap.maxSpeed).removeSuffix("/s") else "") }
-    var autoExport by remember { mutableStateOf(repo.autoExport) }
     var hasFolder by remember { mutableStateOf(repo.downloadTreeUri() != null) }
     var concurrent by remember { mutableFloatStateOf(snap.maxActive.toFloat()) }
 
@@ -121,16 +120,19 @@ fun SettingsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onOpenAuth
 
             SettingCard("Where to save") {
                 Text(
-                    "Files download to the app first, then copy to your chosen folder.",
+                    if (hasFolder)
+                        "Finished downloads are saved to your chosen folder automatically."
+                    else
+                        "Choose a folder and finished downloads are saved there automatically. " +
+                            "Until then they stay inside the app.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(if (hasFolder) "Folder selected" else "No folder chosen", Modifier.weight(1f))
-                    OutlinedButton(onClick = { treePicker.launch(null) }) { Text("Choose folder") }
-                }
-                ToggleRow("Save finished files there automatically", null, autoExport) {
-                    autoExport = it; repo.autoExport = it
+                    OutlinedButton(onClick = { treePicker.launch(null) }) {
+                        Text(if (hasFolder) "Change folder" else "Choose folder")
+                    }
                 }
             }
 

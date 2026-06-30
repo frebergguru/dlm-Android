@@ -153,7 +153,10 @@ class YtdlpManager(private val appContext: Context) : MediaResolver {
                 val req = YoutubeDLRequest(url).apply {
                     addOption("-J")
                     addOption("--no-warnings")
-                    addOption("--no-playlist")
+                    // Playlists/seasons expand to one task per video here (the native
+                    // parser walks "entries"); the package is named after the playlist
+                    // title. Each episode is then fetched as a single video — download()
+                    // keeps --no-playlist so an episode URL can't re-expand.
                     // End-of-options marker: yt-dlp treats everything after "--" as a
                     // positional URL, so a URL beginning with "-" can't be parsed as a
                     // flag (e.g. --exec). buildCommand emits commands just before urls.

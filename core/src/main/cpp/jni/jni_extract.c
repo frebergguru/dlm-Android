@@ -62,10 +62,12 @@ static jobject result_to_jobject(JNIEnv *env, const dlm_extract_result *r,
                                  int needs_ytdlp)
 {
     jstring source = jstr_new(env, r ? r->source : NULL);
+    jstring title = jstr_new(env, r ? r->title : NULL);
     int count = r ? r->count : 0;
     jobjectArray tasks = (*env)->NewObjectArray(env, count, g_jni.task, NULL);
     if (!tasks) {
         (*env)->DeleteLocalRef(env, source);
+        (*env)->DeleteLocalRef(env, title);
         return NULL;
     }
     for (int i = 0; i < count; i++) {
@@ -74,6 +76,7 @@ static jobject result_to_jobject(JNIEnv *env, const dlm_extract_result *r,
             /* task_to_jobject failed (possibly with a pending exception);
              * stop before issuing more JNI calls. */
             (*env)->DeleteLocalRef(env, source);
+            (*env)->DeleteLocalRef(env, title);
             (*env)->DeleteLocalRef(env, tasks);
             return NULL;
         }
@@ -82,9 +85,10 @@ static jobject result_to_jobject(JNIEnv *env, const dlm_extract_result *r,
     }
     jobject res = (*env)->ExceptionCheck(env) ? NULL :
         (*env)->NewObject(env, g_jni.extractResult,
-            g_jni.extractResultCtor, source, tasks,
+            g_jni.extractResultCtor, source, title, tasks,
             (jboolean)(needs_ytdlp ? 1 : 0));
     (*env)->DeleteLocalRef(env, source);
+    (*env)->DeleteLocalRef(env, title);
     (*env)->DeleteLocalRef(env, tasks);
     return res;
 }

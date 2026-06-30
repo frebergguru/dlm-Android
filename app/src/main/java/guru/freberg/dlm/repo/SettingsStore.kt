@@ -21,14 +21,11 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_GLOBAL_AUTOSTART, true)
         set(v) = prefs.edit { putBoolean(KEY_GLOBAL_AUTOSTART, v) }
 
-    /** Persisted SAF tree URI for exporting finished downloads (null => none). */
+    /** Persisted SAF tree URI for the "Where to save" folder (null => none). When
+     * set, finished downloads are moved there automatically. */
     var downloadTreeUri: String?
         get() = prefs.getString(KEY_TREE_URI, null)
         set(v) = prefs.edit { putString(KEY_TREE_URI, v) }
-
-    var autoExport: Boolean
-        get() = prefs.getBoolean(KEY_AUTO_EXPORT, false)
-        set(v) = prefs.edit { putBoolean(KEY_AUTO_EXPORT, v) }
 
     /** Auto-stage copied links into the linkgrabber while the app is foregrounded
      * (Android 10+ blocks background clipboard reads). Off by default. */
@@ -41,7 +38,6 @@ class SettingsStore(context: Context) {
         const val KEY_MAX_SPEED = "max_speed"
         const val KEY_GLOBAL_AUTOSTART = "global_autostart"
         const val KEY_TREE_URI = "download_tree_uri"
-        const val KEY_AUTO_EXPORT = "auto_export"
         const val KEY_CLIPBOARD_MONITOR = "clipboard_monitor"
     }
 }

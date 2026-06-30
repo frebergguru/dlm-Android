@@ -54,7 +54,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
         "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;"
         "Ljava/lang/String;[Ljava/lang/String;I)V");
     g_jni.extractResultCtor = (*env)->GetMethodID(env, g_jni.extractResult, "<init>",
-        "(Ljava/lang/String;[Lguru/freberg/dlm/core/model/Task;Z)V");
+        "(Ljava/lang/String;Ljava/lang/String;[Lguru/freberg/dlm/core/model/Task;Z)V");
     g_jni.progressOnProgress = (*env)->GetMethodID(env, g_jni.progressSink,
         "onProgress", "(JJD)V");
     if (!g_jni.storeRowCtor || !g_jni.pkgRowCtor || !g_jni.taskCtor ||

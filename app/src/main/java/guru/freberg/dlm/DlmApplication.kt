@@ -5,8 +5,10 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import okio.Path.Companion.toPath
 import guru.freberg.dlm.repo.AppContainer
 import guru.freberg.dlm.ytdlp.YtdlpUpdateWorker
 
@@ -32,5 +34,13 @@ class DlmApplication : Application(), SingletonImageLoader.Factory {
             // Favicons are tiny; cap the in-memory cache well below Coil's 25%-of-heap
             // default so the image loader never becomes a memory hog.
             .memoryCache { MemoryCache.Builder().maxSizeBytes(8L * 1024 * 1024).build() }
+            // Persist favicons on disk (app cache dir) so they're reused across
+            // launches instead of refetched every time a site icon is shown.
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("favicon_cache").absolutePath.toPath())
+                    .maxSizeBytes(16L * 1024 * 1024)
+                    .build()
+            }
             .build()
 }

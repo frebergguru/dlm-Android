@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import guru.freberg.dlm.R
 import guru.freberg.dlm.repo.AppContainer
 import guru.freberg.dlm.repo.QueueRepository
+import guru.freberg.dlm.repo.saveSubDir
 import guru.freberg.dlm.scheduler.QState
 import guru.freberg.dlm.scheduler.QueueSnapshot
 import guru.freberg.dlm.ui.MainActivity
@@ -100,24 +101,32 @@ class DownloadService : LifecycleService() {
         }
     }
 
-    /** Copy finished files into the user's SAF tree when auto-export is on. */
+    /**
+     * Move finished files into the user's chosen "Where to save" folder. The native
+     * engine can only write to app-private storage (scoped storage blocks direct
+     * writes to public paths), so a finished file is copied into the SAF tree and the
+     * app-private original is then deleted — the file lives in the user's folder
+     * rather than being duplicated. No folder chosen ⇒ files stay inside the app.
+     */
     private fun observeForExport() {
         lifecycleScope.launch {
             // repo.snapshot is a StateFlow, which already conflates: a busy collector
             // (the blocking SAF copy below) only ever resumes on the latest snapshot,
             // so bursts of ~5 Hz progress emissions never queue redundant export passes.
             repo.snapshot.collect { snap ->
-                if (!repo.autoExport || repo.downloadTreeUri() == null) return@collect
+                if (repo.downloadTreeUri() == null) return@collect
                 val pending = snap.downloads.filter { it.state == QState.DONE && it.id !in exported }
                 if (pending.isNotEmpty()) {
+                    val pkgName = snap.packages.associate { it.id to it.name }
                     // Filesystem checks + SAF copy are blocking; keep them off the
                     // main thread. Single collector → no concurrent `exported` access.
                     withContext(Dispatchers.IO) {
                         for (link in pending) {
+                            val subDir = saveSubDir(link, pkgName)
                             if (!File(link.outPath).exists()) {
                                 // Source already gone; mark handled so we don't rescan it forever.
                                 exported += link.id
-                            } else if (runCatching { repo.exportToTree(link.outPath) }.getOrDefault(false)) {
+                            } else if (runCatching { repo.moveToTree(link.outPath, subDir) }.getOrDefault(false)) {
                                 // Only record success, so a transient SAF failure is retried.
                                 exported += link.id
                             }
