@@ -6,6 +6,7 @@
 #include "dlm/dlm.h"
 
 #include <curl/curl.h>
+#include <strings.h> /* strncasecmp */
 
 #define HTTPGET_UA "dlm/0.1 (+segmented-downloader)"
 #define HTTPGET_MAX (64 * 1024 * 1024) /* cap response bodies at 64 MiB */
@@ -27,14 +28,6 @@ static size_t write_mem(char *ptr, size_t size, size_t nmemb, void *userp)
     return add;
 }
 
-static struct curl_slist *build_list(const char *const *headers)
-{
-    struct curl_slist *l = NULL;
-    if (!headers) return NULL;
-    for (int i = 0; headers[i]; i++) l = curl_slist_append(l, headers[i]);
-    return l;
-}
-
 int dlm_http_request(const char *url, const char *post_fields,
                      const char *const *headers, char **body, long *status)
 {
@@ -43,7 +36,24 @@ int dlm_http_request(const char *url, const char *post_fields,
     if (!c) return DLM_ERR_NOMEM;
 
     membuf m = {NULL, 0};
-    struct curl_slist *hl = build_list(headers);
+    /* Pull any "Cookie:" header out of the list and feed it through the cookie
+     * engine instead (below): a raw Cookie header set via CURLOPT_HTTPHEADER is
+     * resent verbatim to a third-party host on a cross-origin redirect, which
+     * would leak the archive.org session cookie. cookie_val points into the
+     * caller-owned headers array, valid for this call. */
+    struct curl_slist *hl = NULL;
+    const char *cookie_val = NULL;
+    if (headers) {
+        for (int i = 0; headers[i]; i++) {
+            if (strncasecmp(headers[i], "Cookie:", 7) == 0) {
+                const char *v = headers[i] + 7;
+                while (*v == ' ') v++;
+                cookie_val = v;
+            } else {
+                hl = curl_slist_append(hl, headers[i]);
+            }
+        }
+    }
 
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
@@ -60,6 +70,15 @@ int dlm_http_request(const char *url, const char *post_fields,
     curl_easy_setopt(c, CURLOPT_TIMEOUT, 120L);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_mem);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &m);
+    /* Authorization is stripped on a cross-origin redirect by libcurl's default
+     * (UNRESTRICTED_AUTH off); set it explicitly to document the intent. The
+     * session cookie goes through the cookie engine, which binds it to the
+     * request host so it isn't forwarded off-domain on a redirect. */
+    curl_easy_setopt(c, CURLOPT_UNRESTRICTED_AUTH, 0L);
+    if (cookie_val && *cookie_val) {
+        curl_easy_setopt(c, CURLOPT_COOKIEFILE, ""); /* enable in-memory cookie engine */
+        curl_easy_setopt(c, CURLOPT_COOKIE, cookie_val);
+    }
     if (hl) curl_easy_setopt(c, CURLOPT_HTTPHEADER, hl);
     if (post_fields) {
         curl_easy_setopt(c, CURLOPT_POST, 1L);
