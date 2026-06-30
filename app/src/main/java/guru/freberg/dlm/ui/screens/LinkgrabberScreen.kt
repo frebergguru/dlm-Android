@@ -87,7 +87,12 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
     // across download ticks) review lists, so the O(N×M) host/package bucketing does
     // not re-run on every ~5 Hz snapshot emission while a download is active.
     // groupBy preserves first-appearance order, so byHost.keys mirrors render_site_view.
-    val byHost = remember(staged) { staged.groupBy { hostOf(it.url) } }
+    // A link's site is its package's source-URL host when known (extractor task URLs
+    // like "nrk:ID" have no real host), else the link's own host.
+    val pkgSource = remember(pkgs) { pkgs.associate { it.id to it.comment } }
+    fun hostForLink(l: LinkSnap): String =
+        hostOf((if (l.packageId > 0) pkgSource[l.packageId] else null)?.takeIf { it.isNotBlank() } ?: l.url)
+    val byHost = remember(staged, pkgSource) { staged.groupBy { hostForLink(it) } }
     val byPackage = remember(staged) { staged.groupBy { it.packageId } }
     val pkgsByHost = remember(pkgs, staged) { pkgs.groupBy { pkgHost(it, staged) } }
     val hosts = byHost.keys
@@ -209,7 +214,8 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
 /** Host of a package = host of its first staged link (packages are single-site
  * in practice, since each grab stages one source URL). Mirrors `pkg_host`. */
 private fun pkgHost(pkg: PkgSnap, staged: List<LinkSnap>): String =
-    staged.firstOrNull { it.packageId == pkg.id }?.let { hostOf(it.url) } ?: ""
+    pkg.comment?.takeIf { it.isNotBlank() }?.let { hostOf(it) }?.takeIf { it.isNotEmpty() }
+        ?: staged.firstOrNull { it.packageId == pkg.id }?.let { hostOf(it.url) } ?: ""
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

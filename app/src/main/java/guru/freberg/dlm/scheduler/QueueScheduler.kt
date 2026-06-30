@@ -124,20 +124,25 @@ class QueueScheduler(
             }
         }
 
-    /** Stage a crawled set of links as a new linkgrabber package. */
-    suspend fun grab(packageName: String?, folder: String?, links: List<GrabLink>): Long =
+    /**
+     * Stage a crawled set of links as a new linkgrabber package. [source] is the URL
+     * the user actually added (e.g. tv.nrk.no/serie/…); it's persisted in the package's
+     * `comment` and used for the site favicon/grouping, since extractor task URLs can be
+     * opaque (yt-dlp hands back `nrk:ID` etc. with no real host).
+     */
+    suspend fun grab(packageName: String?, folder: String?, links: List<GrabLink>, source: String? = null): Long =
         withContext(storeDispatcher) {
             mutex.withLock {
                 if (links.isEmpty()) return@withLock -1L
                 val pos = nextPos++
                 val pkgId = store.packageAdd(
-                    packageName ?: "links", folder, null, "linkgrabber",
+                    packageName ?: "links", folder, source, "linkgrabber",
                     Priority.DEFAULT, pos, nowSec(),
                 )
                 if (pkgId <= 0) return@withLock -1L
                 pkgs += QPkg(
                     id = pkgId, name = packageName ?: "links", folder = folder,
-                    comment = null, list = ListKind.LINKGRABBER,
+                    comment = source, list = ListKind.LINKGRABBER,
                     priority = Priority.DEFAULT, collapsed = false, position = pos,
                 )
                 for (l in links) {

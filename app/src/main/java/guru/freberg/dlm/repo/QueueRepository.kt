@@ -63,7 +63,7 @@ class QueueRepository(
         if (tasks.isEmpty()) return -1
         val links = tasks.map { it.toGrabLink() }
         val name = packageNameFor(res, url)
-        val pkgId = scheduler.grab(name, null, links)
+        val pkgId = scheduler.grab(name, null, links, source = url)
         return pkgId
     }
 
@@ -79,7 +79,7 @@ class QueueRepository(
             scheduler.add(t.url, t.filename, if (connections > 0) connections else 0, t.delegate)
         } else {
             // multi-file: stage as a package instead
-            scheduler.grab(packageNameFor(res, url), null, tasks.map { it.toGrabLink() })
+            scheduler.grab(packageNameFor(res, url), null, tasks.map { it.toGrabLink() }, source = url)
         }
         ensureService()
         return id

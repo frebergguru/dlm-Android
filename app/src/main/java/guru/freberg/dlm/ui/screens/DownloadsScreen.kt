@@ -124,7 +124,10 @@ fun DownloadsScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddClic
                             activeInPkg = links.count { it.state == QState.ACTIVE },
                             onToggle = { vm.setPackageCollapsed(pkg.id, !pkg.collapsed) },
                             onMenu = { sheetPkg = it },
-                            host = hostOf(links.firstOrNull()?.url),
+                            // Prefer the package's source URL host (the link the user
+                            // added) so the favicon resolves even when task URLs are opaque.
+                            host = pkg.comment?.let { hostOf(it) }?.takeIf { it.isNotEmpty() }
+                                ?: hostOf(links.firstOrNull()?.url),
                         )
                     }
                     if (!pkg.collapsed) {
