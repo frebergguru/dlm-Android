@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import guru.freberg.dlm.scheduler.LinkSnap
 import guru.freberg.dlm.scheduler.MoveDir
@@ -251,9 +252,10 @@ fun PackageHeader(
     onToggle: () -> Unit,
     onMenu: (PkgSnap) -> Unit,
     host: String? = null,
+    indent: Dp = 0.dp,
 ) {
     Row(
-        Modifier.fillMaxWidth().clickable { onToggle() }
+        Modifier.padding(start = indent).fillMaxWidth().clickable { onToggle() }
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

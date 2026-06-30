@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
@@ -69,6 +70,9 @@ import guru.freberg.dlm.ui.util.fileTypeIcon
 import guru.freberg.dlm.ui.util.formatBytes
 import guru.freberg.dlm.ui.util.hostOf
 import guru.freberg.dlm.ui.util.siteLabel
+
+/** How far the package group is inset under its site header in the SITE_PKG view. */
+private val SitePkgIndent = 24.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,7 +188,8 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
                                     // every link of this host, packages ignored
                                     items(hostLinks, key = { it.id }) { link -> ReviewRow(link, onMenu = { sheetLink = it }) }
                                 } else {
-                                    // packages of this host, then its loose links
+                                    // packages of this host (nested a step right of the
+                                    // site header), then its loose links
                                     pkgsByHost[host].orEmpty().forEach { pkg ->
                                         val links = byPackage[pkg.id].orEmpty()
                                         item(key = "pkg-${pkg.id}") {
@@ -192,9 +197,10 @@ fun LinkgrabberScreen(vm: QueueViewModel, modifier: Modifier = Modifier, onAddCl
                                                 pkg = pkg, expanded = !pkg.collapsed, activeInPkg = 0,
                                                 onToggle = { vm.setPackageCollapsed(pkg.id, !pkg.collapsed) },
                                                 onMenu = { sheetPkg = it },
+                                                indent = SitePkgIndent,
                                             )
                                         }
-                                        if (!pkg.collapsed) items(links, key = { it.id }) { link -> ReviewRow(link, onMenu = { sheetLink = it }) }
+                                        if (!pkg.collapsed) items(links, key = { it.id }) { link -> ReviewRow(link, onMenu = { sheetLink = it }, indent = SitePkgIndent) }
                                     }
                                     val loose = hostLinks.filter { it.packageId == 0L }
                                     items(loose, key = { it.id }) { link -> ReviewRow(link, onMenu = { sheetLink = it }) }
@@ -306,9 +312,9 @@ private fun SiteFavicon(host: String, failed: Boolean, onFail: () -> Unit) {
 }
 
 @Composable
-private fun ReviewRow(link: LinkSnap, onMenu: (LinkSnap) -> Unit) {
+private fun ReviewRow(link: LinkSnap, onMenu: (LinkSnap) -> Unit, indent: Dp = 0.dp) {
     Row(
-        Modifier.fillMaxWidth().clickable { onMenu(link) }.padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.padding(start = indent).fillMaxWidth().clickable { onMenu(link) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(fileTypeIcon(link.name), null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
